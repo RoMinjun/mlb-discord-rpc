@@ -258,7 +258,6 @@ def get_previous_game_score(team_id, abbr_map):
     return None
 
 def get_series_result(team_id, game, abbr_map):
-    """Return a string describing the current series standing or winner."""
     try:
         series_game_num = int(game.get("seriesGameNumber", 0))
         games_in_series = int(game.get("gamesInSeries", 0))
@@ -323,7 +322,6 @@ def get_series_result(team_id, game, abbr_map):
     return None
 
 def get_team_record_from_api(team_id):
-    """Fetch win/loss record from the standings endpoint."""
     try:
         season = datetime.now(timezone.utc).year
         url = (
@@ -418,7 +416,7 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     batter = get_batter(game)
 
     if game["status"]["abstractGameState"] == "Live":
-        state_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs != 1 else ''}"
+        state_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
         if pitcher:
             state_str += f" | P: {pitcher}"
         if batter:
