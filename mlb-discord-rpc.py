@@ -18,8 +18,8 @@ if not CLIENT_ID:
     print("CLIENT_ID is not set. Please add it to your .env file.")
     sys.exit(1)
 
-DEFAULT_BASE_ICON_FILLED = "🟦"
-DEFAULT_BASE_ICON_EMPTY = "⚪"
+DEFAULT_BASE_ICON_FILLED = "⚪"
+DEFAULT_BASE_ICON_EMPTY = "🟦"
 DEFAULT_LIVE_INTERVAL = 15
 DEFAULT_IDLE_INTERVAL = 90
 
