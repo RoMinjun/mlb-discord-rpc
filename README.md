@@ -32,7 +32,7 @@
 * [Options & Configuration](#options--configuration)
 
 ## Overview
-**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord. When no live game is detected, it displays the upcoming matchup with your opponent's logo and shows the score from the previous game. The large and small image tooltips include each team's win–loss record.
+**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord. When no live game is detected, it displays the upcoming matchup with your opponent's logo and shows the score from the previous game. The large and small image tooltips include each team's win–loss record. Pre-game statuses now also show the scheduled start time.
 
 ## Screenshots
 
