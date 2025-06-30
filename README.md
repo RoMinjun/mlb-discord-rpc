@@ -73,6 +73,9 @@ Example:
 python mlb-discord-rpc.py --team TOR
 ```
 
+Or use `remote_ui_server.py` on another machine to manage the script through a
+web interface.
+
 ---
 
 ## Options & Configuration
@@ -85,6 +88,8 @@ You can configure **mlb-discord-rpc** via command-line options, a `config.toml` 
   Override the detected local timezone. Use [IANA timezone names](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g., `America/Toronto`).
 * `--live-only`
   Only show your Discord status when your team has a live game.
+* `--remote-url <URL>`
+  Send presence updates to a remote RPC server instead of local Discord.
 
 **Example:**
 
@@ -102,6 +107,7 @@ Example:
 team = "TOR"
 timezone = "America/Toronto"
 live_only = true
+remote_url = "http://<pc-ip>:6463"
 
 [display]
 base_icon_filled = "🟦"
@@ -115,6 +121,9 @@ idle_interval = 90
 * `team` - Team abbreviation (required)
 * `timezone` - IANA timezone string (optional)
 * `live_only` - Only display presence when game is live (optional)
+* `remote_url` - URL of remote RPC server (optional). If you run
+  `remote_ui_server.py` on another machine, set this to the address of
+  `remote_rpc_server.py` on the Discord PC.
 * `[display]` - Customize base icons
 * `[refresh]` - Customize update intervals in seconds
 
@@ -138,6 +147,16 @@ CLIENT_ID=your_discord_client_id_here
 1. Set your `CLIENT_ID` in `.env`.
 2. Optionally configure your team and preferences in `config.toml`.
 3. Or run directly with command-line options.
+4. To run from another machine, start `remote_rpc_server.py` on the Discord PC
+   and use `remote_ui_server.py` on the remote host. Configure the remote URL
+   through the web UI at `http://<rpi-ip>:8080/` and point it to
+   `http://<pc-ip>:6463`.
+   Visit `http://<pc-ip>:6463/` if you ever want to run the script locally
+   instead of remotely.
+
+`remote_rpc_server.py` now serves a simple web UI for choosing **Local** or
+**Remote** mode. In local mode it runs `mlb-discord-rpc.py` automatically with
+your saved settings.
 
 **Enjoy seamless MLB presence on Discord!**
 
