@@ -2,7 +2,7 @@
 
 # MLB-DISCORD-RPC
 
-*Transforming Sports Fandom into Epic Discord Moments*
+*Show live MLB scores on Discord*
 
 <p>
   <img src="https://img.shields.io/badge/last%20commit-today-brightgreen" />
@@ -24,8 +24,8 @@
 
 ## Table of Contents
 * [Overview](#overview)
+* [Screenshots](#screenshots)
 * [Getting Started](#getting-started)
-
   * [Prerequisites](#prerequisites)
   * [Installation](#installation)
   * [Usage](#usage)
@@ -34,44 +34,41 @@
 ## Overview
 **mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord.
 
+## Screenshots
+
+**Live Game Example:**  
+will add when theres a live game :)
+
+**Final Game Example:**  
+![finalegameexample](https://github.com/user-attachments/assets/7216414d-e437-4e56-93e3-1e39977f5d46)
+
+
 ## Getting Started
 
 ### Prerequisites
-
 This project requires the following dependencies:
-
 * **Programming Language:** Python (3.9+)
 * **Package Manager:** Pip
 
 ### Installation
-
 Build mlb-discord-rpc from the source and install dependencies:
-
 1. **Clone the repository:**
-
    ```sh
    git clone https://github.com/RoMinjun/mlb-discord-rpc
    ```
-
 2. **Navigate to the project directory:**
-
    ```sh
    cd mlb-discord-rpc
    ```
-
 3. **Install the dependencies:**
    Using pip:
-
    ```sh
    pip install -r requirements.txt
    ```
 
 ### Usage
-
 Run the project with:
-
 Example:
-
 ```sh
 python mlb-discord-rpc.py --team TOR
 ```
@@ -79,17 +76,13 @@ python mlb-discord-rpc.py --team TOR
 ---
 
 ## Options & Configuration
-
 You can configure **mlb-discord-rpc** via command-line options, a `config.toml` file, and environment variables (`.env` file).
 
 ### Command-Line Arguments
-
 * `--team <TEAM_ABBR>`
   **(required)** Sets your favorite MLB team by its abbreviation (e.g., `LAD`, `TOR`, `CHC`, etc.).
-
 * `--tz <TIMEZONE>`
   Override the detected local timezone. Use [IANA timezone names](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g., `America/Toronto`).
-
 * `--live-only`
   Only show your Discord status when your team has a live game.
 
@@ -101,12 +94,10 @@ python script.py --team TOR --tz America/Toronto --live-only
 
 ---
 
-### Configuration File: `config.toml`
+### (Optional) Configuration File: `config.toml`
 
 You may also set options persistently by editing (or creating) a `config.toml` file in the project directory.
-
 Example:
-
 ```toml
 team = "TOR"
 timezone = "America/Toronto"
