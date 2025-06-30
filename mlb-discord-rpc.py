@@ -151,7 +151,7 @@ def get_next_game_datetime(team_id, local_tz, abbr_map):
     return None
 
 def get_next_game_info(team_id, local_tz, abbr_map):
-    """Return (description, opponent_file_code) for the team's next game."""
+    """Return (description, opp_file_code, opp_id, opp_name) for the next game."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = now_utc.date()
@@ -188,10 +188,15 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 f"{local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
             )
             opponent = away if home["id"] == team_id else home
-            return desc, opponent.get("fileCode", abbr_map.get(opponent["id"], "").lower())
+            return (
+                desc,
+                opponent.get("fileCode", abbr_map.get(opponent["id"], "").lower()),
+                opponent["id"],
+                opponent.get("name"),
+            )
     except RequestException as e:
         print("Failed to fetch next game info:", e)
-    return None, None
+    return None, None, None, None
 
 def get_previous_game_score(team_id, abbr_map):
     """Return a string with the previous game's final score."""
@@ -230,6 +235,24 @@ def get_previous_game_score(team_id, abbr_map):
         print("Failed to fetch previous game:", e)
     return None
 
+def get_team_record(team_id):
+    """Return (wins, losses) for the team."""
+    try:
+        season = datetime.now(timezone.utc).year
+        url = (
+            "https://statsapi.mlb.com/api/v1/standings?"
+            f"teamId={team_id}&season={season}&standingsTypes=regularSeason"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        for record in data.get("records", []):
+            for team in record.get("teamRecords", []):
+                if team.get("team", {}).get("id") == team_id:
+                    return team.get("wins"), team.get("losses")
+    except RequestException as e:
+        print("Failed to fetch team record:", e)
+    return None, None
+
 def get_pitcher(game, team_id):
     try:
         players = game["boxscore"]["teams"]
@@ -267,6 +290,11 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     main_score = main["score"]
     opp_score = opponent["score"]
 
+    main_w, main_l = get_team_record(main["team"]["id"])
+    opp_w, opp_l = get_team_record(opponent["team"]["id"])
+    main_record = f"{main_w}-{main_l}" if None not in (main_w, main_l) else "N/A"
+    opp_record = f"{opp_w}-{opp_l}" if None not in (opp_w, opp_l) else "N/A"
+
     opponent_logo_url = LOGO_TEMPLATE.format(opponent["team"].get("fileCode", opp_abbr.lower()))
     team_logo_url = LOGO_TEMPLATE.format(team_info["code"])
 
@@ -303,9 +331,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         "details": f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}",
         "state": state_str,
         "large_image": team_logo_url,
-        "large_text": f"{team_info['name']} | {'Home' if is_home else 'Away'}",
+        "large_text": f"{team_info['name']} {main_record} | {'Home' if is_home else 'Away'}",
         "small_image": opponent_logo_url,
-        "small_text": f"{opponent['team']['name']} | {'Home' if not is_home else 'Away'}"
+        "small_text": f"{opponent['team']['name']} {opp_record} | {'Home' if not is_home else 'Away'}"
     }
 
 def connect_rpc():
@@ -355,19 +383,25 @@ def main():
                         activity = build_presence(game, team_info, local_tz, icons, abbr_map)
                     except KeyError as e:
                         if str(e) == "'score'":
-                            desc, opp_code = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            desc, opp_code, opp_id, opp_name = get_next_game_info(team_info["id"], local_tz, abbr_map)
                             if desc:
                                 prev = get_previous_game_score(team_info["id"], abbr_map)
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
                                 opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                                mw, ml = get_team_record(team_info["id"])
+                                main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
+                                ow, ol = get_team_record(opp_id) if opp_id else (None, None)
+                                opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                                 update_data = {
                                     "details": desc,
                                     "state": prev or "No recent game",
                                     "large_image": logo,
-                                    "large_text": f"{team_info['name']}"
+                                    "large_text": f"{team_info['name']} {main_record}"
                                 }
                                 if opp_logo:
                                     update_data["small_image"] = opp_logo
+                                if opp_name:
+                                    update_data["small_text"] = f"{opp_name} {opp_record}"
                                 rpc.update(**update_data)
                                 time.sleep(idle_interval)
                                 continue
@@ -378,18 +412,24 @@ def main():
                     if live_only:
                         rpc.clear()
                     else:
-                        desc, opp_code = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        desc, opp_code, opp_id, opp_name = get_next_game_info(team_info["id"], local_tz, abbr_map)
                         prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
                         opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                        mw, ml = get_team_record(team_info["id"])
+                        main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
+                        ow, ol = get_team_record(opp_id) if opp_id else (None, None)
+                        opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                         update_data = {
                             "details": desc or "No upcoming game",
                             "state": prev or "No recent game",
                             "large_image": logo,
-                            "large_text": f"{team_info['name']}"
+                            "large_text": f"{team_info['name']} {main_record}"
                         }
                         if opp_logo:
                             update_data["small_image"] = opp_logo
+                        if opp_name:
+                            update_data["small_text"] = f"{opp_name} {opp_record}"
                         rpc.update(**update_data)
                     time.sleep(idle_interval)
 
