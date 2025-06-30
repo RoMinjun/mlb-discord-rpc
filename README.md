@@ -154,9 +154,40 @@ CLIENT_ID=your_discord_client_id_here
    Visit `http://<pc-ip>:6463/` if you ever want to run the script locally
    instead of remotely.
 
+
 `remote_rpc_server.py` now serves a simple web UI for choosing **Local** or
 **Remote** mode. In local mode it runs `mlb-discord-rpc.py` automatically with
 your saved settings.
+
+### Docker
+
+You can also run everything in Docker. Build the image:
+
+```sh
+docker build -t mlb-rpc .
+```
+
+Run the main script (override the command to run the servers):
+
+```sh
+docker run --rm -it \
+  -e CLIENT_ID=YOUR_CLIENT_ID \
+  mlb-rpc --team TOR
+```
+
+To run the bridge server instead:
+
+```sh
+docker run --rm -it -p 6463:6463 \
+  -e CLIENT_ID=YOUR_CLIENT_ID \
+  mlb-rpc python remote_rpc_server.py
+```
+
+And the remote UI server:
+
+```sh
+docker run --rm -it -p 8080:8080 mlb-rpc python remote_ui_server.py
+```
 
 **Enjoy seamless MLB presence on Discord!**
 
