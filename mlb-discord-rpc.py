@@ -400,11 +400,11 @@ def get_batter(game):
     return None
 
 def shorten_name(name):
-    """Return player's first initial and last name to save space."""
+    """Return player's last name to keep the display concise."""
     try:
         parts = name.split()
-        if len(parts) > 1:
-            return f"{parts[0][0]}. {parts[-1]}"
+        if parts:
+            return parts[-1]
     except Exception:
         pass
     return name
@@ -450,12 +450,12 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         short_p = shorten_name(pitcher) if pitcher else None
         short_b = shorten_name(batter) if batter else None
         if short_p and short_b:
-            state_str += f" | {short_p} vs {short_b}"
+            state_str += f" | {short_p} pitching {short_b}"
         else:
             if short_p:
-                state_str += f" | P {short_p}"
+                state_str += f" | {short_p} pitching"
             if short_b:
-                state_str += f" | B {short_b}"
+                state_str += f" | {short_b} batting"
     elif status in ["Final", "Game Over"]:
         state_str = "FINAL"
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
