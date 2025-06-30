@@ -301,9 +301,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     outs = linescore.get("outs", "?")
     offense = linescore.get("offense", {})
     base_status = "".join([
-        icons["empty"] if offense.get("first") else icons["filled"],
-        icons["empty"] if offense.get("second") else icons["filled"],
-        icons["empty"] if offense.get("third") else icons["filled"]
+        icons["filled"] if offense.get("first") else icons["empty"],
+        icons["filled"] if offense.get("second") else icons["empty"],
+        icons["filled"] if offense.get("third") else icons["empty"]
     ])
 
     inning = linescore.get("currentInning", "?")
