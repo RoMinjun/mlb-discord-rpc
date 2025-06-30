@@ -109,25 +109,43 @@ def fetch_live_game(team_id):
     return None
 
 def get_next_game_datetime(team_id, local_tz, abbr_map):
+    """Return a string describing the team's next scheduled game."""
     try:
         now_utc = datetime.now(timezone.utc)
-        start_date = (now_utc + timedelta(days=1)).date()
+        start_date = now_utc.date()
         end_date = (now_utc + timedelta(days=7)).date()
-        url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}&startDate={start_date}&endDate={end_date}"
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
         response = requests.get(url, timeout=10)
         data = response.json()
 
+        next_game = None
+        next_game_utc = None
+
         for date_entry in data.get("dates", []):
             for game in date_entry.get("games", []):
-                home_id = game["teams"]["home"]["team"]["id"]
-                away_id = game["teams"]["away"]["team"]["id"]
-                home_abbr = abbr_map.get(home_id, "???")
-                away_abbr = abbr_map.get(away_id, "???")
                 game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
-                local_dt = game_utc.astimezone(local_tz)
-                tz_abbr = local_dt.strftime('%Z')
-                venue = game.get("venue", {}).get("name")
-                return f"Next game: {away_abbr} vs {home_abbr} • {local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
+                if game_utc <= now_utc:
+                    continue
+                if next_game_utc is None or game_utc < next_game_utc:
+                    next_game = game
+                    next_game_utc = game_utc
+
+        if next_game:
+            home_id = next_game["teams"]["home"]["team"]["id"]
+            away_id = next_game["teams"]["away"]["team"]["id"]
+            home_abbr = abbr_map.get(home_id, "???")
+            away_abbr = abbr_map.get(away_id, "???")
+            local_dt = next_game_utc.astimezone(local_tz)
+            tz_abbr = local_dt.strftime("%Z")
+            venue = next_game.get("venue", {}).get("name")
+            return (
+                f"Next game: {away_abbr} vs {home_abbr} • "
+                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}"
+                + (f" • {venue}" if venue else "")
+            )
     except RequestException as e:
         print("Failed to fetch next game:", e)
     return None
