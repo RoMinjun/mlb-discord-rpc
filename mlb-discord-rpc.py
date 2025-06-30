@@ -356,12 +356,15 @@ def get_team_record(team_id, game=None):
     return get_team_record_from_api(team_id)
 
 def get_pitcher(game, team_id):
+    """Return the current pitcher's full name if available."""
     try:
-        players = game["boxscore"]["teams"]
-        side = "home" if game["teams"]["home"]["team"]["id"] == team_id else "away"
-        for pdata in players["away" if side == "home" else "home"]["players"].values():
-            if pdata.get("position", {}).get("code") == "P" and pdata.get("stats", {}).get("pitching", {}).get("gamesPitched", 0) > 0:
-                return pdata["person"]["fullName"]
+        pitcher_id = game.get("linescore", {}).get("defense", {}).get("pitcher", {}).get("id")
+        if not pitcher_id:
+            return None
+        for side in ["home", "away"]:
+            for pdata in game["boxscore"]["teams"][side]["players"].values():
+                if pdata.get("person", {}).get("id") == pitcher_id:
+                    return pdata.get("person", {}).get("fullName")
     except KeyError:
         pass
     return None
