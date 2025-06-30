@@ -167,6 +167,30 @@ docker run \
   mlb-discord-rpc --team TOR
 ```
 
+### Connecting to Discord on another machine
+
+If your Discord client is running on a different machine, forward its IPC socket
+over TCP and tell the script where to connect using `DISCORD_HOST` and
+`DISCORD_PORT` (default `6463`). One simple way is to use [`socat`](https://linux.die.net/man/1/socat):
+
+On the machine **running Discord**:
+
+```sh
+socat TCP-LISTEN:6463,fork UNIX-CONNECT:$XDG_RUNTIME_DIR/discord-ipc-0
+```
+
+Then run the container and point it at that host:
+
+```sh
+docker run \
+  --env CLIENT_ID=your_client_id \
+  --env DISCORD_HOST=discord_host_ip \
+  mlb-discord-rpc --team TOR
+```
+
+Alternatively you can set `discord_host` and `discord_port` in `config.toml` or
+use the command-line options `--discord-host` and `--discord-port`.
+
 ---
 
 ## Quick Start

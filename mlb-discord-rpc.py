@@ -5,6 +5,10 @@ import requests
 from datetime import datetime, timedelta, timezone
 from pypresence import Presence
 from pypresence.exceptions import PipeClosed
+from pypresence.exceptions import InvalidID, DiscordError, ConnectionTimeout
+import asyncio
+import json
+import struct
 import tzlocal
 from zoneinfo import ZoneInfo
 from requests.exceptions import RequestException
@@ -13,6 +17,8 @@ from dotenv import load_dotenv
 # Load .env variables
 load_dotenv()
 CLIENT_ID = os.getenv("CLIENT_ID")
+ENV_DISCORD_HOST = os.getenv("DISCORD_HOST")
+ENV_DISCORD_PORT = os.getenv("DISCORD_PORT")
 
 if not CLIENT_ID:
     print("CLIENT_ID is not set. Please add it to your .env file.")
@@ -32,6 +38,35 @@ try:
 except ModuleNotFoundError:
     import toml as tomllib
 
+
+class RemotePresence(Presence):
+    """Presence client that can connect to a remote Discord IPC relay over TCP."""
+
+    def __init__(self, client_id: str, host: str, port: int = 6463):
+        super().__init__(client_id)
+        self._remote_host = host
+        self._remote_port = port
+
+    async def handshake(self):
+        try:
+            self.sock_reader, self.sock_writer = await asyncio.wait_for(
+                asyncio.open_connection(self._remote_host, self._remote_port),
+                self.connection_timeout,
+            )
+        except asyncio.TimeoutError:
+            raise ConnectionTimeout
+
+        self.send_data(0, {"v": 1, "client_id": self.client_id})
+        preamble = await self.sock_reader.read(8)
+        code, length = struct.unpack("<ii", preamble)
+        data = json.loads(await self.sock_reader.read(length))
+        if "code" in data:
+            if data["message"] == "Invalid Client ID":
+                raise InvalidID
+            raise DiscordError(data["code"], data["message"])
+        if self._events_on:
+            self.sock_reader.feed_data = self.on_event
+
 def ordinal(n):
     return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
@@ -49,6 +84,8 @@ def parse_args(config):
     team_abbr = config.get("team")
     tz_name = config.get("timezone")
     live_only = config.get("live_only", False)
+    discord_host = config.get("discord_host", ENV_DISCORD_HOST)
+    discord_port = int(config.get("discord_port", ENV_DISCORD_PORT or 6463))
 
     args = sys.argv[1:]
     for i, arg in enumerate(args):
@@ -58,6 +95,10 @@ def parse_args(config):
             tz_name = args[i + 1]
         elif arg == "--live-only":
             live_only = True
+        elif arg == "--discord-host" and i + 1 < len(args):
+            discord_host = args[i + 1]
+        elif arg == "--discord-port" and i + 1 < len(args):
+            discord_port = int(args[i + 1])
 
     if not team_abbr:
         print("Usage: python script.py --team <TEAM_ABBR> [--tz TIMEZONE] [--live-only]")
@@ -69,7 +110,7 @@ def parse_args(config):
         print(f"Invalid timezone '{tz_name}':", e)
         sys.exit(1)
 
-    return team_abbr, local_tz, live_only
+    return team_abbr, local_tz, live_only, discord_host, discord_port
 
 def get_team_abbr_map():
     try:
@@ -210,10 +251,13 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         "small_text": f"{opponent['team']['name']} | {'Home' if not is_home else 'Away'}"
     }
 
-def connect_rpc():
+def connect_rpc(host=None, port=6463):
     while True:
         try:
-            rpc = Presence(CLIENT_ID)
+            if host:
+                rpc = RemotePresence(CLIENT_ID, host, port)
+            else:
+                rpc = Presence(CLIENT_ID)
             rpc.response_timeout = 5
             rpc.connect()
             print("Connected to Discord RPC.")
@@ -224,7 +268,7 @@ def connect_rpc():
 
 def main():
     config = load_config()
-    team_abbr, local_tz, live_only = parse_args(config)
+    team_abbr, local_tz, live_only, discord_host, discord_port = parse_args(config)
 
     icons = {
         "filled": config.get("display", {}).get("base_icon_filled", DEFAULT_BASE_ICON_FILLED),
@@ -240,7 +284,7 @@ def main():
         print(f"Invalid team abbreviation: {team_abbr}")
         return
 
-    rpc = connect_rpc()
+    rpc = connect_rpc(discord_host, discord_port)
 
     try:
         while True:
@@ -271,7 +315,7 @@ def main():
 
             except PipeClosed:
                 print("Lost Discord RPC connection. Reconnecting...")
-                rpc = connect_rpc()
+                rpc = connect_rpc(discord_host, discord_port)
             except Exception as e:
                 print("Unexpected error:", e)
                 time.sleep(5)
