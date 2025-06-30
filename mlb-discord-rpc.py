@@ -399,6 +399,16 @@ def get_batter(game):
         pass
     return None
 
+def shorten_name(name):
+    """Return player's first initial and last name to save space."""
+    try:
+        parts = name.split()
+        if len(parts) > 1:
+            return f"{parts[0][0]}. {parts[-1]}"
+    except Exception:
+        pass
+    return name
+
 def build_presence(game, team_info, local_tz, icons, abbr_map):
     linescore = game.get("linescore", {})
     home = game["teams"]["home"]
@@ -437,10 +447,15 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
 
     if game["status"]["abstractGameState"] == "Live":
         state_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
-        if pitcher:
-            state_str += f" | P: {pitcher}"
-        if batter:
-            state_str += f" | B: {batter}"
+        short_p = shorten_name(pitcher) if pitcher else None
+        short_b = shorten_name(batter) if batter else None
+        if short_p and short_b:
+            state_str += f" | {short_p} vs {short_b}"
+        else:
+            if short_p:
+                state_str += f" | P {short_p}"
+            if short_b:
+                state_str += f" | B {short_b}"
     elif status in ["Final", "Game Over"]:
         state_str = "FINAL"
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
