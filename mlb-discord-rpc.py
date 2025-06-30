@@ -403,7 +403,9 @@ def shorten_name(name):
     """Return player's last name to keep the display concise."""
     try:
         parts = name.split()
-        if parts:
+        if len(parts) > 2:
+            return " ".join(parts[-2:])
+        elif parts:
             return parts[-1]
     except Exception:
         pass
