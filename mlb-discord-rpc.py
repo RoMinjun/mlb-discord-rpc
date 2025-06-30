@@ -150,6 +150,86 @@ def get_next_game_datetime(team_id, local_tz, abbr_map):
         print("Failed to fetch next game:", e)
     return None
 
+def get_next_game_info(team_id, local_tz, abbr_map):
+    """Return (description, opponent_file_code) for the team's next game."""
+    try:
+        now_utc = datetime.now(timezone.utc)
+        start_date = now_utc.date()
+        end_date = (now_utc + timedelta(days=7)).date()
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        next_game = None
+        next_game_utc = None
+
+        for date_entry in data.get("dates", []):
+            for game in date_entry.get("games", []):
+                game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+                if game_utc <= now_utc:
+                    continue
+                if next_game_utc is None or game_utc < next_game_utc:
+                    next_game = game
+                    next_game_utc = game_utc
+
+        if next_game:
+            home = next_game["teams"]["home"]["team"]
+            away = next_game["teams"]["away"]["team"]
+            home_abbr = abbr_map.get(home["id"], "???")
+            away_abbr = abbr_map.get(away["id"], "???")
+            local_dt = next_game_utc.astimezone(local_tz)
+            tz_abbr = local_dt.strftime("%Z")
+            venue = next_game.get("venue", {}).get("name")
+            desc = (
+                f"Next game: {away_abbr} vs {home_abbr} • "
+                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
+            )
+            opponent = away if home["id"] == team_id else home
+            return desc, opponent.get("fileCode", abbr_map.get(opponent["id"], "").lower())
+    except RequestException as e:
+        print("Failed to fetch next game info:", e)
+    return None, None
+
+def get_previous_game_score(team_id, abbr_map):
+    """Return a string with the previous game's final score."""
+    try:
+        now_utc = datetime.now(timezone.utc)
+        start_date = (now_utc - timedelta(days=7)).date()
+        end_date = now_utc.date()
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        last_game = None
+        last_game_utc = None
+
+        for date_entry in data.get("dates", []):
+            for game in date_entry.get("games", []):
+                game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+                if game_utc >= now_utc:
+                    continue
+                if last_game_utc is None or game_utc > last_game_utc:
+                    last_game = game
+                    last_game_utc = game_utc
+
+        if last_game:
+            home = last_game["teams"]["home"]
+            away = last_game["teams"]["away"]
+            home_abbr = abbr_map.get(home["team"]["id"], "???")
+            away_abbr = abbr_map.get(away["team"]["id"], "???")
+            home_score = home.get("score", 0)
+            away_score = away.get("score", 0)
+            return f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
+    except RequestException as e:
+        print("Failed to fetch previous game:", e)
+    return None
+
 def get_pitcher(game, team_id):
     try:
         players = game["boxscore"]["teams"]
@@ -275,15 +355,20 @@ def main():
                         activity = build_presence(game, team_info, local_tz, icons, abbr_map)
                     except KeyError as e:
                         if str(e) == "'score'":
-                            next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
-                            if next_game:
+                            desc, opp_code = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            if desc:
+                                prev = get_previous_game_score(team_info["id"], abbr_map)
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
-                                rpc.update(**{
-                                    "details": team_info["name"],
-                                    "state": next_game,
+                                opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                                update_data = {
+                                    "details": desc,
+                                    "state": prev or "No recent game",
                                     "large_image": logo,
                                     "large_text": f"{team_info['name']}"
-                                })
+                                }
+                                if opp_logo:
+                                    update_data["small_image"] = opp_logo
+                                rpc.update(**update_data)
                                 time.sleep(idle_interval)
                                 continue
                         raise
@@ -293,13 +378,19 @@ def main():
                     if live_only:
                         rpc.clear()
                     else:
+                        desc, opp_code = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
-                        rpc.update(**{
-                            "details": team_info["name"],
-                            "state": "No live game",
+                        opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                        update_data = {
+                            "details": desc or "No upcoming game",
+                            "state": prev or "No recent game",
                             "large_image": logo,
                             "large_text": f"{team_info['name']}"
-                        })
+                        }
+                        if opp_logo:
+                            update_data["small_image"] = opp_logo
+                        rpc.update(**update_data)
                     time.sleep(idle_interval)
 
             except PipeClosed:
