@@ -151,7 +151,7 @@ def get_next_game_datetime(team_id, local_tz, abbr_map):
     return None
 
 def get_next_game_info(team_id, local_tz, abbr_map):
-    """Return (description, opp_file_code, opp_id, opp_name) for the next game."""
+    """Return info about the next game including each team's record."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = now_utc.date()
@@ -176,10 +176,12 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                     next_game_utc = game_utc
 
         if next_game:
-            home = next_game["teams"]["home"]["team"]
-            away = next_game["teams"]["away"]["team"]
-            home_abbr = abbr_map.get(home["id"], "???")
-            away_abbr = abbr_map.get(away["id"], "???")
+            home = next_game["teams"]["home"]
+            away = next_game["teams"]["away"]
+            home_team = home["team"]
+            away_team = away["team"]
+            home_abbr = abbr_map.get(home_team["id"], "???")
+            away_abbr = abbr_map.get(away_team["id"], "???")
             local_dt = next_game_utc.astimezone(local_tz)
             tz_abbr = local_dt.strftime("%Z")
             venue = next_game.get("venue", {}).get("name")
@@ -187,16 +189,21 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 f"Next game: {away_abbr} vs {home_abbr} • "
                 f"{local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
             )
-            opponent = away if home["id"] == team_id else home
+            opponent = away if home_team["id"] == team_id else home
+            opp_team = opponent["team"]
+            opp_record = opponent.get("leagueRecord", {})
+            main_record = home.get("leagueRecord", {}) if home_team["id"] == team_id else away.get("leagueRecord", {})
             return (
                 desc,
-                opponent.get("fileCode", abbr_map.get(opponent["id"], "").lower()),
-                opponent["id"],
-                opponent.get("name"),
+                opp_team.get("fileCode", abbr_map.get(opp_team["id"], "").lower()),
+                opp_team["id"],
+                opp_team.get("name"),
+                (main_record.get("wins"), main_record.get("losses")),
+                (opp_record.get("wins"), opp_record.get("losses")),
             )
     except RequestException as e:
         print("Failed to fetch next game info:", e)
-    return None, None, None, None
+    return None, None, None, None, (None, None), (None, None)
 
 def get_previous_game_score(team_id, abbr_map):
     """Return a string with the previous game's final score."""
@@ -235,8 +242,8 @@ def get_previous_game_score(team_id, abbr_map):
         print("Failed to fetch previous game:", e)
     return None
 
-def get_team_record(team_id):
-    """Return (wins, losses) for the team."""
+def get_team_record_from_api(team_id):
+    """Fetch win/loss record from the standings endpoint."""
     try:
         season = datetime.now(timezone.utc).year
         url = (
@@ -252,6 +259,23 @@ def get_team_record(team_id):
     except RequestException as e:
         print("Failed to fetch team record:", e)
     return None, None
+
+
+def get_team_record(team_id, game=None):
+    """Return (wins, losses) using game data if available, else the API."""
+    if game:
+        try:
+            for side in ("home", "away"):
+                team = game["teams"][side]
+                if team["team"]["id"] == team_id:
+                    rec = team.get("leagueRecord", {})
+                    wins = rec.get("wins")
+                    losses = rec.get("losses")
+                    if wins is not None and losses is not None:
+                        return wins, losses
+        except KeyError:
+            pass
+    return get_team_record_from_api(team_id)
 
 def get_pitcher(game, team_id):
     try:
@@ -290,8 +314,8 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     main_score = main["score"]
     opp_score = opponent["score"]
 
-    main_w, main_l = get_team_record(main["team"]["id"])
-    opp_w, opp_l = get_team_record(opponent["team"]["id"])
+    main_w, main_l = get_team_record(main["team"]["id"], game)
+    opp_w, opp_l = get_team_record(opponent["team"]["id"], game)
     main_record = f"{main_w}-{main_l}" if None not in (main_w, main_l) else "N/A"
     opp_record = f"{opp_w}-{opp_l}" if None not in (opp_w, opp_l) else "N/A"
 
@@ -383,14 +407,14 @@ def main():
                         activity = build_presence(game, team_info, local_tz, icons, abbr_map)
                     except KeyError as e:
                         if str(e) == "'score'":
-                            desc, opp_code, opp_id, opp_name = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
                             if desc:
                                 prev = get_previous_game_score(team_info["id"], abbr_map)
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
                                 opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
-                                mw, ml = get_team_record(team_info["id"])
+                                mw, ml = main_rec
                                 main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
-                                ow, ol = get_team_record(opp_id) if opp_id else (None, None)
+                                ow, ol = opp_rec
                                 opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                                 update_data = {
                                     "details": desc,
@@ -412,13 +436,13 @@ def main():
                     if live_only:
                         rpc.clear()
                     else:
-                        desc, opp_code, opp_id, opp_name = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
                         prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
                         opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
-                        mw, ml = get_team_record(team_info["id"])
+                        mw, ml = main_rec
                         main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
-                        ow, ol = get_team_record(opp_id) if opp_id else (None, None)
+                        ow, ol = opp_rec
                         opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                         update_data = {
                             "details": desc or "No upcoming game",
