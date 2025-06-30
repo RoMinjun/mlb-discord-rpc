@@ -355,30 +355,47 @@ def get_team_record(team_id, game=None):
             pass
     return get_team_record_from_api(team_id)
 
-def get_pitcher(game, team_id):
+def get_pitcher(game, team_id=None):
     """Return the current pitcher's full name if available."""
     try:
-        pitcher_id = game.get("linescore", {}).get("defense", {}).get("pitcher", {}).get("id")
+        pitcher = game.get("linescore", {}).get("defense", {}).get("pitcher")
+        if isinstance(pitcher, dict):
+            name = pitcher.get("fullName")
+            if name:
+                return name
+            pitcher_id = pitcher.get("id")
+        else:
+            pitcher_id = pitcher
+
         if not pitcher_id:
             return None
         for side in ["home", "away"]:
             for pdata in game["boxscore"]["teams"][side]["players"].values():
                 if pdata.get("person", {}).get("id") == pitcher_id:
                     return pdata.get("person", {}).get("fullName")
-    except KeyError:
+    except (KeyError, TypeError):
         pass
     return None
 
 def get_batter(game):
+    """Return the current batter's full name if available."""
     try:
-        batter_id = game["linescore"].get("offense", {}).get("batter", {}).get("id")
+        batter = game.get("linescore", {}).get("offense", {}).get("batter")
+        if isinstance(batter, dict):
+            name = batter.get("fullName")
+            if name:
+                return name
+            batter_id = batter.get("id")
+        else:
+            batter_id = batter
+
         if not batter_id:
             return None
         for side in ["home", "away"]:
             for pdata in game["boxscore"]["teams"][side]["players"].values():
-                if pdata["person"]["id"] == batter_id:
-                    return pdata["person"]["fullName"]
-    except KeyError:
+                if pdata.get("person", {}).get("id") == batter_id:
+                    return pdata.get("person", {}).get("fullName")
+    except (KeyError, TypeError):
         pass
     return None
 
