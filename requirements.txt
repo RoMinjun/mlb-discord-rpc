@@ -1,0 +1,4 @@
+requests
+pypresence
+tzlocal
+python-dotenv
