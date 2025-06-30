@@ -35,6 +35,15 @@ except ModuleNotFoundError:
 def ordinal(n):
     return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
+def format_start_time(game, tz):
+    """Return formatted local start time for a game."""
+    try:
+        dt = datetime.fromisoformat(game.get("gameDate").replace("Z", "+00:00"))
+        local_dt = dt.astimezone(tz)
+        return local_dt.strftime("%a %H:%M %Z")
+    except Exception:
+        return None
+
 def load_config():
     try:
         with open("config.toml", "rb") as f:
@@ -185,9 +194,10 @@ def get_next_game_info(team_id, local_tz, abbr_map):
             local_dt = next_game_utc.astimezone(local_tz)
             tz_abbr = local_dt.strftime("%Z")
             venue = next_game.get("venue", {}).get("name")
+            start_str = f"{local_dt.strftime('%a %H:%M')} {tz_abbr}"
             desc = (
                 f"Next game: {away_abbr} vs {home_abbr} • "
-                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
+                f"{start_str}" + (f" • {venue}" if venue else "")
             )
             opponent = away if home_team["id"] == team_id else home
             opp_team = opponent["team"]
@@ -200,10 +210,11 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 opp_team.get("name"),
                 (main_record.get("wins"), main_record.get("losses")),
                 (opp_record.get("wins"), opp_record.get("losses")),
+                start_str,
             )
     except RequestException as e:
         print("Failed to fetch next game info:", e)
-    return None, None, None, None, (None, None), (None, None)
+    return None, None, None, None, (None, None), (None, None), None
 
 def get_previous_game_score(team_id, abbr_map):
     """Return the last game's score and series result if available."""
@@ -418,7 +429,10 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         if next_game:
             state_str += f" • {next_game}"
     else:
+        start_time = format_start_time(game, local_tz)
         state_str = status
+        if start_time:
+            state_str += f" • {start_time}"
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
     if status in ["Final", "Game Over"]:
@@ -482,7 +496,7 @@ def main():
                         activity = build_presence(game, team_info, local_tz, icons, abbr_map)
                     except KeyError as e:
                         if str(e) == "'score'":
-                            desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            desc, opp_code, opp_id, opp_name, main_rec, opp_rec, start_str = get_next_game_info(team_info["id"], local_tz, abbr_map)
                             if desc:
                                 prev = get_previous_game_score(team_info["id"], abbr_map)
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
@@ -491,9 +505,13 @@ def main():
                                 main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
                                 ow, ol = opp_rec
                                 opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
+                                start_time = start_str or format_start_time(game, local_tz)
+                                state_field = prev or "No recent game"
+                                if start_time:
+                                    state_field = f"{state_field} • {start_time}"
                                 update_data = {
                                     "details": desc,
-                                    "state": prev or "No recent game",
+                                    "state": state_field,
                                     "large_image": logo,
                                     "large_text": f"{team_info['name']} • {main_record}"
                                 }
@@ -511,7 +529,7 @@ def main():
                     if live_only:
                         rpc.clear()
                     else:
-                        desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        desc, opp_code, opp_id, opp_name, main_rec, opp_rec, start_str = get_next_game_info(team_info["id"], local_tz, abbr_map)
                         prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
                         opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
@@ -519,9 +537,12 @@ def main():
                         main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
                         ow, ol = opp_rec
                         opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
+                        state_field = prev or "No recent game"
+                        if start_str:
+                            state_field = f"{state_field} • {start_str}"
                         update_data = {
                             "details": desc or "No upcoming game",
-                            "state": prev or "No recent game",
+                            "state": state_field,
                             "large_image": logo,
                             "large_text": f"{team_info['name']} • {main_record}"
                         }
