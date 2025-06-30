@@ -355,29 +355,59 @@ def get_team_record(team_id, game=None):
             pass
     return get_team_record_from_api(team_id)
 
-def get_pitcher(game, team_id):
+def get_pitcher(game, team_id=None):
+    """Return the current pitcher's full name if available."""
     try:
-        players = game["boxscore"]["teams"]
-        side = "home" if game["teams"]["home"]["team"]["id"] == team_id else "away"
-        for pdata in players["away" if side == "home" else "home"]["players"].values():
-            if pdata.get("position", {}).get("code") == "P" and pdata.get("stats", {}).get("pitching", {}).get("gamesPitched", 0) > 0:
-                return pdata["person"]["fullName"]
-    except KeyError:
+        pitcher = game.get("linescore", {}).get("defense", {}).get("pitcher")
+        if isinstance(pitcher, dict):
+            name = pitcher.get("fullName")
+            if name:
+                return name
+            pitcher_id = pitcher.get("id")
+        else:
+            pitcher_id = pitcher
+
+        if not pitcher_id:
+            return None
+        for side in ["home", "away"]:
+            for pdata in game["boxscore"]["teams"][side]["players"].values():
+                if pdata.get("person", {}).get("id") == pitcher_id:
+                    return pdata.get("person", {}).get("fullName")
+    except (KeyError, TypeError):
         pass
     return None
 
 def get_batter(game):
+    """Return the current batter's full name if available."""
     try:
-        batter_id = game["linescore"].get("offense", {}).get("batter", {}).get("id")
+        batter = game.get("linescore", {}).get("offense", {}).get("batter")
+        if isinstance(batter, dict):
+            name = batter.get("fullName")
+            if name:
+                return name
+            batter_id = batter.get("id")
+        else:
+            batter_id = batter
+
         if not batter_id:
             return None
         for side in ["home", "away"]:
             for pdata in game["boxscore"]["teams"][side]["players"].values():
-                if pdata["person"]["id"] == batter_id:
-                    return pdata["person"]["fullName"]
-    except KeyError:
+                if pdata.get("person", {}).get("id") == batter_id:
+                    return pdata.get("person", {}).get("fullName")
+    except (KeyError, TypeError):
         pass
     return None
+
+def shorten_name(name):
+    """Return player's last name to keep the display concise."""
+    try:
+        parts = name.split()
+        if parts:
+            return parts[-1]
+    except Exception:
+        pass
+    return name
 
 def build_presence(game, team_info, local_tz, icons, abbr_map):
     linescore = game.get("linescore", {})
@@ -414,13 +444,25 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
 
     pitcher = get_pitcher(game, team_info["id"])
     batter = get_batter(game)
+    offense_team_id = linescore.get("offense", {}).get("team", {}).get("id")
+    team_is_offense = offense_team_id == team_info["id"]
 
     if game["status"]["abstractGameState"] == "Live":
         state_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
-        if pitcher:
-            state_str += f" | P: {pitcher}"
-        if batter:
-            state_str += f" | B: {batter}"
+        short_p = shorten_name(pitcher) if pitcher else None
+        short_b = shorten_name(batter) if batter else None
+        if short_p or short_b:
+            if team_is_offense:
+                first, second, verb = short_b, short_p, "batting"
+            else:
+                first, second, verb = short_p, short_b, "pitching"
+
+            if first and second:
+                state_str += f" | {first} {verb} {second}"
+            elif first:
+                state_str += f" | {first} {verb}"
+            elif second:
+                state_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
     elif status in ["Final", "Game Over"]:
         state_str = "FINAL"
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
