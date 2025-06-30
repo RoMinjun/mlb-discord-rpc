@@ -36,11 +36,18 @@
 
 ## Screenshots
 
-**Live Game Example:**  
-will add when theres a live game :)
+**Live Game Example (with player on 2nd base):**
+
+![livegame](https://github.com/user-attachments/assets/b1eea643-ce30-441c-ac44-b1a40ffbf887)
 
 **Final Game Example:**  
+
 ![finalegameexample](https://github.com/user-attachments/assets/7216414d-e437-4e56-93e3-1e39977f5d46)
+
+**Pre Game state:**
+
+![pregame](https://github.com/user-attachments/assets/add81593-965a-400a-8be5-6e1404eb4eac)
+
 
 
 ## Getting Started
