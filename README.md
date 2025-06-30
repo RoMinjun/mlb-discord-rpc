@@ -30,6 +30,7 @@
   * [Installation](#installation)
   * [Usage](#usage)
 * [Options & Configuration](#options--configuration)
+* [Docker](#docker)
 
 ## Overview
 **mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord.
@@ -129,6 +130,41 @@ Example `.env`:
 
 ```
 CLIENT_ID=your_discord_client_id_here
+```
+
+## Docker
+
+You can run the script inside a Docker container. This is useful for devices like a
+Raspberry Pi.
+
+```sh
+docker build -t mlb-discord-rpc .
+```
+
+Then start the container with your `CLIENT_ID` and any options:
+
+```sh
+docker run --env CLIENT_ID=your_client_id mlb-discord-rpc --team TOR
+```
+
+Mount a configuration file if desired:
+
+```sh
+docker run \
+  --env CLIENT_ID=your_client_id \
+  -v $(pwd)/config.toml:/app/config.toml:ro \
+  mlb-discord-rpc --team TOR
+```
+
+If Discord is running on the host, mount its IPC socket so the container can
+connect to it. The socket is usually located in `$XDG_RUNTIME_DIR` (e.g.
+`/run/user/$(id -u)/discord-ipc-0`).
+
+```sh
+docker run \
+  --env CLIENT_ID=your_client_id \
+  -v $XDG_RUNTIME_DIR:$XDG_RUNTIME_DIR \
+  mlb-discord-rpc --team TOR
 ```
 
 ---
