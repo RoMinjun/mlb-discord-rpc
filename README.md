@@ -148,16 +148,10 @@ CLIENT_ID=your_discord_client_id_here
 2. Optionally configure your team and preferences in `config.toml`.
 3. Or run directly with command-line options.
 4. To run from another machine, start `remote_rpc_server.py` on the Discord PC
-   and use `remote_ui_server.py` on the remote host. Configure the remote URL
-   through the web UI at `http://<rpi-ip>:8080/` and point it to
-   `http://<pc-ip>:6463`.
-   Visit `http://<pc-ip>:6463/` if you ever want to run the script locally
-   instead of remotely.
+   and run either `remote_ui_server.py` or `mlb-discord-rpc.py` with
+   `--remote-url http://<pc-ip>:6463` on the remote host.
 
 
-`remote_rpc_server.py` now serves a simple web UI for choosing **Local** or
-**Remote** mode. In local mode it runs `mlb-discord-rpc.py` automatically with
-your saved settings.
 
 ### Docker
 
@@ -175,7 +169,7 @@ docker run --rm -it \
   mlb-rpc --team TOR
 ```
 
-To run the bridge server instead:
+To run the RPC server instead:
 
 ```sh
 docker run --rm -it -p 6463:6463 \
