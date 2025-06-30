@@ -109,28 +109,173 @@ def fetch_live_game(team_id):
     return None
 
 def get_next_game_datetime(team_id, local_tz, abbr_map):
+    """Return a string describing the team's next scheduled game."""
     try:
         now_utc = datetime.now(timezone.utc)
-        start_date = (now_utc + timedelta(days=1)).date()
+        start_date = now_utc.date()
         end_date = (now_utc + timedelta(days=7)).date()
-        url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}&startDate={start_date}&endDate={end_date}"
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
         response = requests.get(url, timeout=10)
         data = response.json()
 
+        next_game = None
+        next_game_utc = None
+
         for date_entry in data.get("dates", []):
             for game in date_entry.get("games", []):
-                home_id = game["teams"]["home"]["team"]["id"]
-                away_id = game["teams"]["away"]["team"]["id"]
-                home_abbr = abbr_map.get(home_id, "???")
-                away_abbr = abbr_map.get(away_id, "???")
                 game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
-                local_dt = game_utc.astimezone(local_tz)
-                tz_abbr = local_dt.strftime('%Z')
-                venue = game.get("venue", {}).get("name")
-                return f"Next game: {away_abbr} vs {home_abbr} • {local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
+                if game_utc <= now_utc:
+                    continue
+                if next_game_utc is None or game_utc < next_game_utc:
+                    next_game = game
+                    next_game_utc = game_utc
+
+        if next_game:
+            home_id = next_game["teams"]["home"]["team"]["id"]
+            away_id = next_game["teams"]["away"]["team"]["id"]
+            home_abbr = abbr_map.get(home_id, "???")
+            away_abbr = abbr_map.get(away_id, "???")
+            local_dt = next_game_utc.astimezone(local_tz)
+            tz_abbr = local_dt.strftime("%Z")
+            venue = next_game.get("venue", {}).get("name")
+            return (
+                f"Next game: {away_abbr} vs {home_abbr} • "
+                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}"
+                + (f" • {venue}" if venue else "")
+            )
     except RequestException as e:
         print("Failed to fetch next game:", e)
     return None
+
+def get_next_game_info(team_id, local_tz, abbr_map):
+    """Return info about the next game including each team's record."""
+    try:
+        now_utc = datetime.now(timezone.utc)
+        start_date = now_utc.date()
+        end_date = (now_utc + timedelta(days=7)).date()
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        next_game = None
+        next_game_utc = None
+
+        for date_entry in data.get("dates", []):
+            for game in date_entry.get("games", []):
+                game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+                if game_utc <= now_utc:
+                    continue
+                if next_game_utc is None or game_utc < next_game_utc:
+                    next_game = game
+                    next_game_utc = game_utc
+
+        if next_game:
+            home = next_game["teams"]["home"]
+            away = next_game["teams"]["away"]
+            home_team = home["team"]
+            away_team = away["team"]
+            home_abbr = abbr_map.get(home_team["id"], "???")
+            away_abbr = abbr_map.get(away_team["id"], "???")
+            local_dt = next_game_utc.astimezone(local_tz)
+            tz_abbr = local_dt.strftime("%Z")
+            venue = next_game.get("venue", {}).get("name")
+            desc = (
+                f"Next game: {away_abbr} vs {home_abbr} • "
+                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}" + (f" • {venue}" if venue else "")
+            )
+            opponent = away if home_team["id"] == team_id else home
+            opp_team = opponent["team"]
+            opp_record = opponent.get("leagueRecord", {})
+            main_record = home.get("leagueRecord", {}) if home_team["id"] == team_id else away.get("leagueRecord", {})
+            return (
+                desc,
+                opp_team.get("fileCode", abbr_map.get(opp_team["id"], "").lower()),
+                opp_team["id"],
+                opp_team.get("name"),
+                (main_record.get("wins"), main_record.get("losses")),
+                (opp_record.get("wins"), opp_record.get("losses")),
+            )
+    except RequestException as e:
+        print("Failed to fetch next game info:", e)
+    return None, None, None, None, (None, None), (None, None)
+
+def get_previous_game_score(team_id, abbr_map):
+    """Return a string with the previous game's final score."""
+    try:
+        now_utc = datetime.now(timezone.utc)
+        start_date = (now_utc - timedelta(days=7)).date()
+        end_date = now_utc.date()
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        last_game = None
+        last_game_utc = None
+
+        for date_entry in data.get("dates", []):
+            for game in date_entry.get("games", []):
+                game_utc = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+                if game_utc >= now_utc:
+                    continue
+                if last_game_utc is None or game_utc > last_game_utc:
+                    last_game = game
+                    last_game_utc = game_utc
+
+        if last_game:
+            home = last_game["teams"]["home"]
+            away = last_game["teams"]["away"]
+            home_abbr = abbr_map.get(home["team"]["id"], "???")
+            away_abbr = abbr_map.get(away["team"]["id"], "???")
+            home_score = home.get("score", 0)
+            away_score = away.get("score", 0)
+            return f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
+    except RequestException as e:
+        print("Failed to fetch previous game:", e)
+    return None
+
+def get_team_record_from_api(team_id):
+    """Fetch win/loss record from the standings endpoint."""
+    try:
+        season = datetime.now(timezone.utc).year
+        url = (
+            "https://statsapi.mlb.com/api/v1/standings?"
+            f"teamId={team_id}&season={season}&standingsTypes=regularSeason"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        for record in data.get("records", []):
+            for team in record.get("teamRecords", []):
+                if team.get("team", {}).get("id") == team_id:
+                    return team.get("wins"), team.get("losses")
+    except RequestException as e:
+        print("Failed to fetch team record:", e)
+    return None, None
+
+
+def get_team_record(team_id, game=None):
+    """Return (wins, losses) using game data if available, else the API."""
+    if game:
+        try:
+            for side in ("home", "away"):
+                team = game["teams"][side]
+                if team["team"]["id"] == team_id:
+                    rec = team.get("leagueRecord", {})
+                    wins = rec.get("wins")
+                    losses = rec.get("losses")
+                    if wins is not None and losses is not None:
+                        return wins, losses
+        except KeyError:
+            pass
+    return get_team_record_from_api(team_id)
 
 def get_pitcher(game, team_id):
     try:
@@ -169,15 +314,20 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     main_score = main["score"]
     opp_score = opponent["score"]
 
+    main_w, main_l = get_team_record(main["team"]["id"], game)
+    opp_w, opp_l = get_team_record(opponent["team"]["id"], game)
+    main_record = f"{main_w}-{main_l}" if None not in (main_w, main_l) else "N/A"
+    opp_record = f"{opp_w}-{opp_l}" if None not in (opp_w, opp_l) else "N/A"
+
     opponent_logo_url = LOGO_TEMPLATE.format(opponent["team"].get("fileCode", opp_abbr.lower()))
     team_logo_url = LOGO_TEMPLATE.format(team_info["code"])
 
     outs = linescore.get("outs", "?")
     offense = linescore.get("offense", {})
     base_status = "".join([
-        icons["empty"] if offense.get("first") else icons["filled"],
-        icons["empty"] if offense.get("second") else icons["filled"],
-        icons["empty"] if offense.get("third") else icons["filled"]
+        icons["filled"] if offense.get("first") else icons["empty"],
+        icons["filled"] if offense.get("second") else icons["empty"],
+        icons["filled"] if offense.get("third") else icons["empty"]
     ])
 
     inning = linescore.get("currentInning", "?")
@@ -205,9 +355,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         "details": f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}",
         "state": state_str,
         "large_image": team_logo_url,
-        "large_text": f"{team_info['name']} | {'Home' if is_home else 'Away'}",
+        "large_text": f"{team_info['name']} {main_record} | {'Home' if is_home else 'Away'}",
         "small_image": opponent_logo_url,
-        "small_text": f"{opponent['team']['name']} | {'Home' if not is_home else 'Away'}"
+        "small_text": f"{opponent['team']['name']} {opp_record} | {'Home' if not is_home else 'Away'}"
     }
 
 def connect_rpc():
@@ -253,20 +403,58 @@ def main():
                         rpc.clear()
                         time.sleep(idle_interval)
                         continue
-                    activity = build_presence(game, team_info, local_tz, icons, abbr_map)
+                    try:
+                        activity = build_presence(game, team_info, local_tz, icons, abbr_map)
+                    except KeyError as e:
+                        if str(e) == "'score'":
+                            desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            if desc:
+                                prev = get_previous_game_score(team_info["id"], abbr_map)
+                                logo = LOGO_TEMPLATE.format(team_info["code"])
+                                opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                                mw, ml = main_rec
+                                main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
+                                ow, ol = opp_rec
+                                opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
+                                update_data = {
+                                    "details": desc,
+                                    "state": prev or "No recent game",
+                                    "large_image": logo,
+                                    "large_text": f"{team_info['name']} {main_record}"
+                                }
+                                if opp_logo:
+                                    update_data["small_image"] = opp_logo
+                                if opp_name:
+                                    update_data["small_text"] = f"{opp_name} {opp_record}"
+                                rpc.update(**update_data)
+                                time.sleep(idle_interval)
+                                continue
+                        raise
                     rpc.update(**activity)
                     time.sleep(live_interval if abstract_state == "Live" else idle_interval)
                 else:
                     if live_only:
                         rpc.clear()
                     else:
+                        desc, opp_code, opp_id, opp_name, main_rec, opp_rec = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
-                        rpc.update({
-                            "details": team_info["name"],
-                            "state": "No live game",
+                        opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
+                        mw, ml = main_rec
+                        main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
+                        ow, ol = opp_rec
+                        opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
+                        update_data = {
+                            "details": desc or "No upcoming game",
+                            "state": prev or "No recent game",
                             "large_image": logo,
-                            "large_text": f"{team_info['name']}"
-                        })
+                            "large_text": f"{team_info['name']} {main_record}"
+                        }
+                        if opp_logo:
+                            update_data["small_image"] = opp_logo
+                        if opp_name:
+                            update_data["small_text"] = f"{opp_name} {opp_record}"
+                        rpc.update(**update_data)
                     time.sleep(idle_interval)
 
             except PipeClosed:
