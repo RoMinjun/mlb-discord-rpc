@@ -253,7 +253,22 @@ def main():
                         rpc.clear()
                         time.sleep(idle_interval)
                         continue
-                    activity = build_presence(game, team_info, local_tz, icons, abbr_map)
+                    try:
+                        activity = build_presence(game, team_info, local_tz, icons, abbr_map)
+                    except KeyError as e:
+                        if str(e) == "'score'":
+                            next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
+                            if next_game:
+                                logo = LOGO_TEMPLATE.format(team_info["code"])
+                                rpc.update({
+                                    "details": team_info["name"],
+                                    "state": next_game,
+                                    "large_image": logo,
+                                    "large_text": f"{team_info['name']}"
+                                })
+                                time.sleep(idle_interval)
+                                continue
+                        raise
                     rpc.update(**activity)
                     time.sleep(live_interval if abstract_state == "Live" else idle_interval)
                 else:
