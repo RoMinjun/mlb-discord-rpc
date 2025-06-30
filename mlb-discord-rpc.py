@@ -247,13 +247,11 @@ def get_previous_game_score(team_id, abbr_map):
     return None
 
 def get_series_result(team_id, game, abbr_map):
-    """Return a string describing who won the series if it just concluded."""
+    """Return a string describing the current series standing or winner."""
     try:
         series_game_num = int(game.get("seriesGameNumber", 0))
         games_in_series = int(game.get("gamesInSeries", 0))
-        if series_game_num != games_in_series:
-            return None
-        if game["status"]["detailedState"] not in ("Final", "Game Over"):
+        if series_game_num == 0 or games_in_series == 0:
             return None
 
         home = game["teams"]["home"]
@@ -263,7 +261,7 @@ def get_series_result(team_id, game, abbr_map):
         opp_abbr = abbr_map.get(opp_id, "???")
 
         game_date = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
-        start_date = (game_date - timedelta(days=games_in_series - 1)).date()
+        start_date = (game_date - timedelta(days=series_game_num - 1)).date()
         end_date = game_date.date()
 
         url = (
@@ -291,11 +289,20 @@ def get_series_result(team_id, game, abbr_map):
                         wins += 1
                     elif h.get("isWinner"):
                         losses += 1
+        if wins == 0 and losses == 0:
+            return None
+
+        concluded = (
+            series_game_num == games_in_series
+            and game["status"].get("detailedState") in ("Final", "Game Over")
+        )
 
         if wins > losses:
-            return f"{abbr_map.get(team_id, '???')} wins series {wins}-{losses}"
+            verb = "wins" if concluded else "leads"
+            return f"{abbr_map.get(team_id, '???')} {verb} series {wins}-{losses}"
         elif losses > wins:
-            return f"{opp_abbr} wins series {losses}-{wins}"
+            verb = "wins" if concluded else "leads"
+            return f"{opp_abbr} {verb} series {losses}-{wins}"
         else:
             return f"Series tied {wins}-{losses}"
     except RequestException as e:
