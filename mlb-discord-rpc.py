@@ -260,7 +260,7 @@ def main():
                             next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
                             if next_game:
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
-                                rpc.update({
+                                rpc.update(**{
                                     "details": team_info["name"],
                                     "state": next_game,
                                     "large_image": logo,
@@ -276,7 +276,7 @@ def main():
                         rpc.clear()
                     else:
                         logo = LOGO_TEMPLATE.format(team_info['code'])
-                        rpc.update({
+                        rpc.update(**{
                             "details": team_info["name"],
                             "state": "No live game",
                             "large_image": logo,
