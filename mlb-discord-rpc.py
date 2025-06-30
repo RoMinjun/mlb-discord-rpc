@@ -206,7 +206,7 @@ def get_next_game_info(team_id, local_tz, abbr_map):
     return None, None, None, None, (None, None), (None, None)
 
 def get_previous_game_score(team_id, abbr_map):
-    """Return a string with the previous game's final score."""
+    """Return the last game's score and series result if available."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = (now_utc - timedelta(days=7)).date()
@@ -237,9 +237,78 @@ def get_previous_game_score(team_id, abbr_map):
             away_abbr = abbr_map.get(away["team"]["id"], "???")
             home_score = home.get("score", 0)
             away_score = away.get("score", 0)
-            return f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
+            result = f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
+            series_result = get_series_result(team_id, last_game, abbr_map)
+            if series_result:
+                result += f" • {series_result}"
+            return result
     except RequestException as e:
         print("Failed to fetch previous game:", e)
+    return None
+
+def get_series_result(team_id, game, abbr_map):
+    """Return a string describing the current series standing or winner."""
+    try:
+        series_game_num = int(game.get("seriesGameNumber", 0))
+        games_in_series = int(game.get("gamesInSeries", 0))
+        if series_game_num == 0 or games_in_series == 0:
+            return None
+
+        home = game["teams"]["home"]
+        away = game["teams"]["away"]
+        opponent = away if home["team"]["id"] == team_id else home
+        opp_id = opponent["team"]["id"]
+        opp_abbr = abbr_map.get(opp_id, "???")
+
+        game_date = datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+        start_date = (game_date - timedelta(days=series_game_num - 1)).date()
+        end_date = game_date.date()
+
+        url = (
+            f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={team_id}"
+            f"&startDate={start_date}&endDate={end_date}"
+        )
+        response = requests.get(url, timeout=10)
+        data = response.json()
+
+        wins = 0
+        losses = 0
+        for date_entry in data.get("dates", []):
+            for g in date_entry.get("games", []):
+                h = g["teams"]["home"]
+                a = g["teams"]["away"]
+                if opp_id not in (h["team"]["id"], a["team"]["id"]):
+                    continue
+                if h["team"]["id"] == team_id:
+                    if h.get("isWinner"):
+                        wins += 1
+                    elif a.get("isWinner"):
+                        losses += 1
+                elif a["team"]["id"] == team_id:
+                    if a.get("isWinner"):
+                        wins += 1
+                    elif h.get("isWinner"):
+                        losses += 1
+        if wins == 0 and losses == 0:
+            return None
+
+        concluded = (
+            series_game_num == games_in_series
+            and game["status"].get("detailedState") in ("Final", "Game Over")
+        )
+
+        if wins > losses:
+            verb = "wins" if concluded else "leads"
+            return f"{abbr_map.get(team_id, '???')} {verb} series {wins}-{losses}"
+        elif losses > wins:
+            verb = "wins" if concluded else "leads"
+            return f"{opp_abbr} {verb} series {losses}-{wins}"
+        else:
+            return f"Series tied {wins}-{losses}"
+    except RequestException as e:
+        print("Failed to fetch series result:", e)
+    except Exception as e:
+        print("Error getting series result:", e)
     return None
 
 def get_team_record_from_api(team_id):
@@ -351,13 +420,19 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     else:
         state_str = status
 
+    details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
+    if status in ["Final", "Game Over"]:
+        series_result = get_series_result(team_info["id"], game, abbr_map)
+        if series_result:
+            details += f" • {series_result}"
+
     return {
-        "details": f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}",
+        "details": details,
         "state": state_str,
         "large_image": team_logo_url,
-        "large_text": f"{team_info['name']} {main_record} | {'Home' if is_home else 'Away'}",
+        "large_text": f"{team_info['name']} • {main_record} | {'Home' if is_home else 'Away'}",
         "small_image": opponent_logo_url,
-        "small_text": f"{opponent['team']['name']} {opp_record} | {'Home' if not is_home else 'Away'}"
+        "small_text": f"{opponent['team']['name']} • {opp_record} | {'Home' if not is_home else 'Away'}"
     }
 
 def connect_rpc():
@@ -420,12 +495,12 @@ def main():
                                     "details": desc,
                                     "state": prev or "No recent game",
                                     "large_image": logo,
-                                    "large_text": f"{team_info['name']} {main_record}"
+                                    "large_text": f"{team_info['name']} • {main_record}"
                                 }
                                 if opp_logo:
                                     update_data["small_image"] = opp_logo
                                 if opp_name:
-                                    update_data["small_text"] = f"{opp_name} {opp_record}"
+                                    update_data["small_text"] = f"{opp_name} • {opp_record}"
                                 rpc.update(**update_data)
                                 time.sleep(idle_interval)
                                 continue
@@ -448,12 +523,12 @@ def main():
                             "details": desc or "No upcoming game",
                             "state": prev or "No recent game",
                             "large_image": logo,
-                            "large_text": f"{team_info['name']} {main_record}"
+                            "large_text": f"{team_info['name']} • {main_record}"
                         }
                         if opp_logo:
                             update_data["small_image"] = opp_logo
                         if opp_name:
-                            update_data["small_text"] = f"{opp_name} {opp_record}"
+                            update_data["small_text"] = f"{opp_name} • {opp_record}"
                         rpc.update(**update_data)
                     time.sleep(idle_interval)
 
