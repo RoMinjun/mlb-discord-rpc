@@ -202,7 +202,7 @@ def get_next_game_info(team_id, local_tz, abbr_map):
             series_game = int(next_game.get("seriesGameNumber", 0))
             series_total = int(next_game.get("gamesInSeries", 0))
             series_status = None
-            if series_game > 1 and series_total > 1:
+            if series_game > 1:
                 series_status = get_series_result(team_id, next_game, abbr_map)
             opponent = away if home_team["id"] == team_id else home
             opp_team = opponent["team"]
@@ -571,8 +571,12 @@ def main():
                                 if start_time:
                                     state_field = f"{state_field} • {start_time}"
                                 details_field = desc
-                                if series_status and series_total:
-                                    details_field += f" • {series_status} (Game {series_game} of {series_total})"
+                                if series_status:
+                                    details_field += f" • {series_status}"
+                                    if series_total:
+                                        details_field += f" (Game {series_game} of {series_total})"
+                                    else:
+                                        details_field += f" (Game {series_game})"
                                 update_data = {
                                     "details": details_field,
                                     "state": state_field,
@@ -616,8 +620,12 @@ def main():
                         if start_str:
                             state_field = f"{state_field} • {start_str}"
                         details_field = desc or "No upcoming game"
-                        if series_status and series_total:
-                            details_field += f" • {series_status} (Game {series_game} of {series_total})"
+                        if series_status:
+                            details_field += f" • {series_status}"
+                            if series_total:
+                                details_field += f" (Game {series_game} of {series_total})"
+                            else:
+                                details_field += f" (Game {series_game})"
                         update_data = {
                             "details": details_field,
                             "state": state_field,
