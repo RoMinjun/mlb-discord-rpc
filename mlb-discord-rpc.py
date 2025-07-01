@@ -486,10 +486,16 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
             state_str += f" • {start_time}"
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
-    if status in ["Final", "Game Over"]:
+    series_result = None
+    if game["status"].get("abstractGameState") != "Live":
         series_result = get_series_result(team_info["id"], game, abbr_map)
-        if series_result:
-            details += f" • {series_result}"
+    if series_result:
+        details += f" • {series_result}"
+        if game["status"].get("abstractGameState") != "Final" and status not in ["Final", "Game Over"]:
+            game_num = int(game.get("seriesGameNumber", 0))
+            total_games = int(game.get("gamesInSeries", 0))
+            if game_num:
+                details += f" (Game {game_num}{f' of {total_games}' if total_games else ''})"
 
     return {
         "details": details,
