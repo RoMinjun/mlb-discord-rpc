@@ -202,7 +202,7 @@ def get_next_game_info(team_id, local_tz, abbr_map):
             series_game = int(next_game.get("seriesGameNumber", 0))
             series_total = int(next_game.get("gamesInSeries", 0))
             series_status = None
-            if series_game > 1:
+            if series_game > 0:
                 series_status = get_series_result(team_id, next_game, abbr_map)
             opponent = away if home_team["id"] == team_id else home
             opp_team = opponent["team"]
@@ -269,7 +269,7 @@ def get_series_result(team_id, game, abbr_map):
     try:
         series_game_num = int(game.get("seriesGameNumber", 0))
         games_in_series = int(game.get("gamesInSeries", 0))
-        if series_game_num == 0 or games_in_series == 0:
+        if series_game_num <= 1:
             return None
 
         home = game["teams"]["home"]
@@ -311,7 +311,8 @@ def get_series_result(team_id, game, abbr_map):
             return None
 
         concluded = (
-            series_game_num == games_in_series
+            games_in_series
+            and series_game_num == games_in_series
             and game["status"].get("detailedState") in ("Final", "Game Over")
         )
 
