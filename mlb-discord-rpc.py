@@ -147,14 +147,18 @@ def get_next_game_datetime(team_id, local_tz, abbr_map):
             away_id = next_game["teams"]["away"]["team"]["id"]
             home_abbr = abbr_map.get(home_id, "???")
             away_abbr = abbr_map.get(away_id, "???")
+            game_num = int(next_game.get("seriesGameNumber", 0))
+            total_games = int(next_game.get("gamesInSeries", 0))
             local_dt = next_game_utc.astimezone(local_tz)
             tz_abbr = local_dt.strftime("%Z")
             venue = next_game.get("venue", {}).get("name")
-            return (
-                f"Next game: {away_abbr} vs {home_abbr} • "
-                f"{local_dt.strftime('%a %H:%M')} {tz_abbr}"
-                + (f" • {venue}" if venue else "")
-            )
+            desc = f"Next game: {away_abbr} vs {home_abbr}"
+            if game_num:
+                desc += f" (Game {game_num}{'/' + str(total_games) if total_games else ''})"
+            desc += f" • {local_dt.strftime('%a %H:%M')} {tz_abbr}"
+            if venue:
+                desc += f" • {venue}"
+            return desc
     except RequestException as e:
         print("Failed to fetch next game:", e)
     return None
@@ -195,12 +199,14 @@ def get_next_game_info(team_id, local_tz, abbr_map):
             tz_abbr = local_dt.strftime("%Z")
             venue = next_game.get("venue", {}).get("name")
             start_str = f"{local_dt.strftime('%a %H:%M')} {tz_abbr}"
-            desc = (
-                f"Next game: {away_abbr} vs {home_abbr} • "
-                f"{start_str}" + (f" • {venue}" if venue else "")
-            )
             series_game = int(next_game.get("seriesGameNumber", 0))
             series_total = int(next_game.get("gamesInSeries", 0))
+            desc = f"Next game: {away_abbr} vs {home_abbr}"
+            if series_game:
+                desc += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
+            desc += " • " + start_str
+            if venue:
+                desc += f" • {venue}"
             series_status = None
             if series_game > 0:
                 series_status = get_series_result(team_id, next_game, abbr_map)
@@ -571,8 +577,6 @@ def main():
                                 state_field = prev or "No recent game"
                                 if series_status:
                                     state_field += f" • {series_status}"
-                                    if series_game:
-                                        state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
                                 details_field = desc
                                 update_data = {
                                     "details": details_field,
@@ -616,8 +620,6 @@ def main():
                         state_field = prev or "No recent game"
                         if series_status:
                             state_field += f" • {series_status}"
-                            if series_game:
-                                state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
                         details_field = desc or "No upcoming game"
                         update_data = {
                             "details": details_field,
