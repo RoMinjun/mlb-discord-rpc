@@ -480,22 +480,20 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         if next_game:
             state_str += f" • {next_game}"
     else:
-        start_time = format_start_time(game, local_tz)
         state_str = status
-        if start_time:
-            state_str += f" • {start_time}"
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
     series_result = None
     if game["status"].get("abstractGameState") != "Live":
         series_result = get_series_result(team_info["id"], game, abbr_map)
     if series_result:
-        details += f" • {series_result}"
+        addition = series_result
         if game["status"].get("abstractGameState") != "Final" and status not in ["Final", "Game Over"]:
             game_num = int(game.get("seriesGameNumber", 0))
             total_games = int(game.get("gamesInSeries", 0))
             if game_num:
-                details += f" (Game {game_num}{f' of {total_games}' if total_games else ''})"
+                addition += f" (Game {game_num}{'/' + str(total_games) if total_games else ''})"
+        state_str += f" • {addition}"
 
     return {
         "details": details,
@@ -573,17 +571,12 @@ def main():
                                 main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
                                 ow, ol = opp_rec
                                 opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
-                                start_time = start_str or format_start_time(game, local_tz)
                                 state_field = prev or "No recent game"
-                                if start_time:
-                                    state_field = f"{state_field} • {start_time}"
-                                details_field = desc
                                 if series_status:
-                                    details_field += f" • {series_status}"
-                                    if series_total:
-                                        details_field += f" (Game {series_game} of {series_total})"
-                                    else:
-                                        details_field += f" (Game {series_game})"
+                                    state_field += f" • {series_status}"
+                                    if series_game:
+                                        state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
+                                details_field = desc
                                 update_data = {
                                     "details": details_field,
                                     "state": state_field,
@@ -624,15 +617,11 @@ def main():
                         ow, ol = opp_rec
                         opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                         state_field = prev or "No recent game"
-                        if start_str:
-                            state_field = f"{state_field} • {start_str}"
-                        details_field = desc or "No upcoming game"
                         if series_status:
-                            details_field += f" • {series_status}"
-                            if series_total:
-                                details_field += f" (Game {series_game} of {series_total})"
-                            else:
-                                details_field += f" (Game {series_game})"
+                            state_field += f" • {series_status}"
+                            if series_game:
+                                state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
+                        details_field = desc or "No upcoming game"
                         update_data = {
                             "details": details_field,
                             "state": state_field,
