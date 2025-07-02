@@ -225,7 +225,7 @@ def get_next_game_info(team_id, local_tz, abbr_map):
     return None, None, None, None, (None, None), (None, None), None, None, None, None
 
 def get_previous_game_score(team_id, abbr_map):
-    """Return the last game's score and series result if available."""
+    """Return the last game's score."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = (now_utc - timedelta(days=7)).date()
@@ -257,9 +257,6 @@ def get_previous_game_score(team_id, abbr_map):
             home_score = home.get("score", 0)
             away_score = away.get("score", 0)
             result = f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
-            series_result = get_series_result(team_id, last_game, abbr_map)
-            if series_result:
-                result += f" • {series_result}"
             return result
     except RequestException as e:
         print("Failed to fetch previous game:", e)
