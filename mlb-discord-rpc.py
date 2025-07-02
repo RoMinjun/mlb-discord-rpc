@@ -160,7 +160,7 @@ def get_next_game_datetime(team_id, local_tz, abbr_map):
     return None
 
 def get_next_game_info(team_id, local_tz, abbr_map):
-    """Return info about the next game including each team's record."""
+    """Return info about the next game including records and series status."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = now_utc.date()
@@ -199,6 +199,11 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 f"Next game: {away_abbr} vs {home_abbr} • "
                 f"{start_str}" + (f" • {venue}" if venue else "")
             )
+            series_game = int(next_game.get("seriesGameNumber", 0))
+            series_total = int(next_game.get("gamesInSeries", 0))
+            series_status = None
+            if series_game > 0:
+                series_status = get_series_result(team_id, next_game, abbr_map)
             opponent = away if home_team["id"] == team_id else home
             opp_team = opponent["team"]
             opp_record = opponent.get("leagueRecord", {})
@@ -211,13 +216,16 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 (main_record.get("wins"), main_record.get("losses")),
                 (opp_record.get("wins"), opp_record.get("losses")),
                 start_str,
+                series_status,
+                series_game,
+                series_total,
             )
     except RequestException as e:
         print("Failed to fetch next game info:", e)
-    return None, None, None, None, (None, None), (None, None), None
+    return None, None, None, None, (None, None), (None, None), None, None, None, None
 
 def get_previous_game_score(team_id, abbr_map):
-    """Return the last game's score and series result if available."""
+    """Return the last game's score."""
     try:
         now_utc = datetime.now(timezone.utc)
         start_date = (now_utc - timedelta(days=7)).date()
@@ -249,9 +257,6 @@ def get_previous_game_score(team_id, abbr_map):
             home_score = home.get("score", 0)
             away_score = away.get("score", 0)
             result = f"Prev: {away_abbr} {away_score} - {home_abbr} {home_score}"
-            series_result = get_series_result(team_id, last_game, abbr_map)
-            if series_result:
-                result += f" • {series_result}"
             return result
     except RequestException as e:
         print("Failed to fetch previous game:", e)
@@ -261,7 +266,7 @@ def get_series_result(team_id, game, abbr_map):
     try:
         series_game_num = int(game.get("seriesGameNumber", 0))
         games_in_series = int(game.get("gamesInSeries", 0))
-        if series_game_num == 0 or games_in_series == 0:
+        if series_game_num <= 1:
             return None
 
         home = game["teams"]["home"]
@@ -303,7 +308,8 @@ def get_series_result(team_id, game, abbr_map):
             return None
 
         concluded = (
-            series_game_num == games_in_series
+            games_in_series
+            and series_game_num == games_in_series
             and game["status"].get("detailedState") in ("Final", "Game Over")
         )
 
@@ -471,16 +477,20 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         if next_game:
             state_str += f" • {next_game}"
     else:
-        start_time = format_start_time(game, local_tz)
         state_str = status
-        if start_time:
-            state_str += f" • {start_time}"
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
-    if status in ["Final", "Game Over"]:
+    series_result = None
+    if game["status"].get("abstractGameState") != "Live":
         series_result = get_series_result(team_info["id"], game, abbr_map)
-        if series_result:
-            details += f" • {series_result}"
+    if series_result:
+        addition = series_result
+        if game["status"].get("abstractGameState") != "Final" and status not in ["Final", "Game Over"]:
+            game_num = int(game.get("seriesGameNumber", 0))
+            total_games = int(game.get("gamesInSeries", 0))
+            if game_num:
+                addition += f" (Game {game_num}{'/' + str(total_games) if total_games else ''})"
+        state_str += f" • {addition}"
 
     return {
         "details": details,
@@ -538,7 +548,18 @@ def main():
                         activity = build_presence(game, team_info, local_tz, icons, abbr_map)
                     except KeyError as e:
                         if str(e) == "'score'":
-                            desc, opp_code, opp_id, opp_name, main_rec, opp_rec, start_str = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                            (
+                                desc,
+                                opp_code,
+                                opp_id,
+                                opp_name,
+                                main_rec,
+                                opp_rec,
+                                start_str,
+                                series_status,
+                                series_game,
+                                series_total,
+                            ) = get_next_game_info(team_info["id"], local_tz, abbr_map)
                             if desc:
                                 prev = get_previous_game_score(team_info["id"], abbr_map)
                                 logo = LOGO_TEMPLATE.format(team_info["code"])
@@ -547,12 +568,14 @@ def main():
                                 main_record = f"{mw}-{ml}" if None not in (mw, ml) else "N/A"
                                 ow, ol = opp_rec
                                 opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
-                                start_time = start_str or format_start_time(game, local_tz)
                                 state_field = prev or "No recent game"
-                                if start_time:
-                                    state_field = f"{state_field} • {start_time}"
+                                if series_status:
+                                    state_field += f" • {series_status}"
+                                    if series_game:
+                                        state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
+                                details_field = desc
                                 update_data = {
-                                    "details": desc,
+                                    "details": details_field,
                                     "state": state_field,
                                     "large_image": logo,
                                     "large_text": f"{team_info['name']} • {main_record}"
@@ -571,7 +594,18 @@ def main():
                     if live_only:
                         rpc.clear()
                     else:
-                        desc, opp_code, opp_id, opp_name, main_rec, opp_rec, start_str = get_next_game_info(team_info["id"], local_tz, abbr_map)
+                        (
+                            desc,
+                            opp_code,
+                            opp_id,
+                            opp_name,
+                            main_rec,
+                            opp_rec,
+                            start_str,
+                            series_status,
+                            series_game,
+                            series_total,
+                        ) = get_next_game_info(team_info["id"], local_tz, abbr_map)
                         prev = get_previous_game_score(team_info["id"], abbr_map)
                         logo = LOGO_TEMPLATE.format(team_info['code'])
                         opp_logo = LOGO_TEMPLATE.format(opp_code) if opp_code else None
@@ -580,10 +614,13 @@ def main():
                         ow, ol = opp_rec
                         opp_record = f"{ow}-{ol}" if None not in (ow, ol) else "N/A"
                         state_field = prev or "No recent game"
-                        if start_str:
-                            state_field = f"{state_field} • {start_str}"
+                        if series_status:
+                            state_field += f" • {series_status}"
+                            if series_game:
+                                state_field += f" (Game {series_game}{'/' + str(series_total) if series_total else ''})"
+                        details_field = desc or "No upcoming game"
                         update_data = {
-                            "details": desc or "No upcoming game",
+                            "details": details_field,
                             "state": state_field,
                             "large_image": logo,
                             "large_text": f"{team_info['name']} • {main_record}"
