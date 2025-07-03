@@ -461,8 +461,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     offense_team_id = linescore.get("offense", {}).get("team", {}).get("id")
     team_is_offense = offense_team_id == team_info["id"]
 
+    state_parts = []
     if game["status"]["abstractGameState"] == "Live":
-        state_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
+        live_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
         short_p = shorten_name(pitcher) if pitcher else None
         short_b = shorten_name(batter) if batter else None
         if short_p or short_b:
@@ -472,20 +473,22 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
                 first, second, verb = short_p, short_b, "pitching"
 
             if first and second:
-                state_str += f" | {first} {verb} {second}"
+                live_str += f" | {first} {verb} {second}"
             elif first:
-                state_str += f" | {first} {verb}"
+                live_str += f" | {first} {verb}"
             elif second:
-                state_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
+                live_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
+        state_parts.append(live_str)
     elif status in ["Final", "Game Over"]:
-        state_str = "FINAL"
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
         if next_game:
-            state_str += f" • {next_game}"
+            state_parts.append(next_game)
     else:
-        state_str = status
+        state_parts.append(status)
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
+    if status in ["Final", "Game Over"]:
+        details = f"FINAL • {details}"
     series_result = None
     if game["status"].get("abstractGameState") != "Live":
         series_result = get_series_result(team_info["id"], game, abbr_map)
@@ -496,7 +499,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
             total_games = int(game.get("gamesInSeries", 0))
             if game_num:
                 addition += f" (Game {game_num}{'/' + str(total_games) if total_games else ''})"
-        state_str += f" • {addition}"
+        state_parts.append(addition)
+
+    state_str = " • ".join(state_parts)
 
     return {
         "details": details,
