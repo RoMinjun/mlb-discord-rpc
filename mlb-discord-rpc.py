@@ -499,7 +499,10 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
             total_games = int(game.get("gamesInSeries", 0))
             if game_num:
                 addition += f" (Game {game_num}{'/' + str(total_games) if total_games else ''})"
-        state_parts.append(addition)
+        if status in ["Final", "Game Over"]:
+            details += f" • {addition}"
+        else:
+            state_parts.append(addition)
 
     state_str = " • ".join(state_parts)
 
