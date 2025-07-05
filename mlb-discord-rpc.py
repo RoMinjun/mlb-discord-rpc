@@ -476,6 +476,7 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
             and balls is not None
             and strikes is not None
         )
+        show_next_up = inning_state.lower() not in ("top", "bottom")
 
         if short_p or short_b:
             if team_is_offense:
@@ -483,12 +484,14 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
             else:
                 first, second, verb = short_p, short_b, "pitching"
 
+            prefix = "Next up: " if show_next_up else ""
+
             if first and second:
-                live_str += f" | {first} {verb} {second}"
+                live_str += f" | {prefix}{first} {verb} {second}"
             elif first:
-                live_str += f" | {first} {verb}"
+                live_str += f" | {prefix}{first} {verb}"
             elif second:
-                live_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
+                live_str += f" | {prefix}{second} {'pitching' if team_is_offense else 'batting'}"
 
             if show_count:
                 live_str += f" ({balls}-{strikes})"
