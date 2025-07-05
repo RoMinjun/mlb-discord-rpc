@@ -470,21 +470,18 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         short_p = shorten_name(pitcher) if pitcher else None
         short_b = shorten_name(batter) if batter else None
 
-        batter_display = short_b
-        show_count = inning_state.lower() in ("top", "bottom")
-        if (
-            show_count
+        show_count = (
+            inning_state.lower() in ("top", "bottom")
             and short_b is not None
             and balls is not None
             and strikes is not None
-        ):
-            batter_display = f"{short_b} ({balls}-{strikes})"
+        )
 
-        if short_p or batter_display:
+        if short_p or short_b:
             if team_is_offense:
-                first, second, verb = batter_display, short_p, "batting"
+                first, second, verb = short_b, short_p, "batting"
             else:
-                first, second, verb = short_p, batter_display, "pitching"
+                first, second, verb = short_p, short_b, "pitching"
 
             if first and second:
                 live_str += f" | {first} {verb} {second}"
@@ -492,6 +489,9 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
                 live_str += f" | {first} {verb}"
             elif second:
                 live_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
+
+            if show_count:
+                live_str += f" ({balls}-{strikes})"
         state_parts.append(live_str)
     elif status in ["Final", "Game Over"]:
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
