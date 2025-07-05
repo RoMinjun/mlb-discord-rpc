@@ -471,7 +471,13 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         short_b = shorten_name(batter) if batter else None
 
         batter_display = short_b
-        if short_b is not None and balls is not None and strikes is not None:
+        show_count = inning_state.lower() in ("top", "bottom")
+        if (
+            show_count
+            and short_b is not None
+            and balls is not None
+            and strikes is not None
+        ):
             batter_display = f"{short_b} ({balls}-{strikes})"
 
         if short_p or batter_display:
