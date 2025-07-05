@@ -461,16 +461,24 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     offense_team_id = linescore.get("offense", {}).get("team", {}).get("id")
     team_is_offense = offense_team_id == team_info["id"]
 
+    balls = linescore.get("balls")
+    strikes = linescore.get("strikes")
+
     state_parts = []
     if game["status"]["abstractGameState"] == "Live":
         live_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
         short_p = shorten_name(pitcher) if pitcher else None
         short_b = shorten_name(batter) if batter else None
-        if short_p or short_b:
+
+        batter_display = short_b
+        if short_b is not None and balls is not None and strikes is not None:
+            batter_display = f"{short_b} ({balls}-{strikes})"
+
+        if short_p or batter_display:
             if team_is_offense:
-                first, second, verb = short_b, short_p, "batting"
+                first, second, verb = batter_display, short_p, "batting"
             else:
-                first, second, verb = short_p, short_b, "pitching"
+                first, second, verb = short_p, batter_display, "pitching"
 
             if first and second:
                 live_str += f" | {first} {verb} {second}"
