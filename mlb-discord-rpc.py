@@ -461,23 +461,40 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
     offense_team_id = linescore.get("offense", {}).get("team", {}).get("id")
     team_is_offense = offense_team_id == team_info["id"]
 
+    balls = linescore.get("balls")
+    strikes = linescore.get("strikes")
+
     state_parts = []
     if game["status"]["abstractGameState"] == "Live":
         live_str = f"{inning_str} | Bases {base_status} | {outs} Out{'s' if outs > 1 else ''}"
         short_p = shorten_name(pitcher) if pitcher else None
         short_b = shorten_name(batter) if batter else None
+
+        show_count = (
+            inning_state.lower() in ("top", "bottom")
+            and short_b is not None
+            and balls is not None
+            and strikes is not None
+        )
+        show_next_up = inning_state.lower() not in ("top", "bottom")
+
         if short_p or short_b:
             if team_is_offense:
                 first, second, verb = short_b, short_p, "batting"
             else:
                 first, second, verb = short_p, short_b, "pitching"
 
+            prefix = "Next up: " if show_next_up else ""
+
             if first and second:
-                live_str += f" | {first} {verb} {second}"
+                live_str += f" | {prefix}{first} {verb} {second}"
             elif first:
-                live_str += f" | {first} {verb}"
+                live_str += f" | {prefix}{first} {verb}"
             elif second:
-                live_str += f" | {second} {'pitching' if team_is_offense else 'batting'}"
+                live_str += f" | {prefix}{second} {'pitching' if team_is_offense else 'batting'}"
+
+            if show_count:
+                live_str += f" ({balls}-{strikes})"
         state_parts.append(live_str)
     elif status in ["Final", "Game Over"]:
         next_game = get_next_game_datetime(team_info["id"], local_tz, abbr_map)
