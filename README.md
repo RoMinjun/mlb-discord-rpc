@@ -67,17 +67,20 @@ Build mlb-discord-rpc from the source and install dependencies:
    ```sh
    cd mlb-discord-rpc
    ```
-3. **Install the dependencies:**
-   Using pip:
+3. **Install the dependencies** using pip (Python 3):
    ```sh
-   pip install -r requirements.txt
+   python3 -m pip install -r requirements.txt
    ```
 
 ### Usage
-Run the project with:
-Example:
+Run the project with Python 3:
 ```sh
-python mlb-discord-rpc.py --team TOR
+python3 mlb-discord-rpc.py --team TOR
+```
+Or make it executable on Linux:
+```sh
+chmod +x mlb-discord-rpc.py
+./mlb-discord-rpc.py --team TOR
 ```
 
 ---
@@ -125,6 +128,10 @@ idle_interval = 90
 * `[display]` - Customize base icons
 * `[refresh]` - Customize update intervals in seconds
 
+On some Linux setups the emoji base icons may appear as boxes. Install a color
+emoji font like **Noto Color Emoji**, or set `base_icon_filled` and
+`base_icon_empty` to plain ASCII characters.
+
 ---
 
 ### Environment Variables (`.env`)
@@ -145,6 +152,22 @@ CLIENT_ID=your_discord_client_id_here
 1. Set your `CLIENT_ID` in `.env`.
 2. Optionally configure your team and preferences in `config.toml`.
 3. Or run directly with command-line options.
+
+### Running on Linux
+Install Python 3 and pip using your package manager (example for Ubuntu/Pop!_OS):
+```sh
+sudo apt install python3 python3-pip
+```
+After installing the dependencies with `python3 -m pip install -r requirements.txt`,
+ensure the Discord client is running and start the script as shown above.
+
+### Running on Windows
+Install [Python 3 for Windows](https://www.python.org/downloads/windows/). When installing,
+make sure to check **"Add python.exe to PATH"**. Open **Command Prompt** or **PowerShell** and run:
+```cmd
+py -3 -m pip install -r requirements.txt
+py -3 mlb-discord-rpc.py --team TOR
+```
 
 **Enjoy seamless MLB presence on Discord!**
 
