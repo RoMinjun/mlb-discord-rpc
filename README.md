@@ -36,13 +36,14 @@
 
 ## Screenshots
 
-**Live Game Example (with player on 2nd base):**
+**Live Game Example (with player on 1nd base):**
 
-![livegame](https://github.com/user-attachments/assets/b1eea643-ce30-441c-ac44-b1a40ffbf887)
+![livegame](https://github.com/user-attachments/assets/6d88759a-f1fb-49d6-96d1-4f47187f7a4d)
 
-**Final Game Example:**  
+**Final Game Example:**
 
-![finalegameexample](https://github.com/user-attachments/assets/7216414d-e437-4e56-93e3-1e39977f5d46)
+![finalegameexample](https://github.com/user-attachments/assets/0e8d6592-fa1a-4212-89f0-a2bf651cc18e)
+
 
 **Pre Game state:**
 
