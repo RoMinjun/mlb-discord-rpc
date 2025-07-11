@@ -32,7 +32,7 @@
 * [Options & Configuration](#options--configuration)
 
 ## Overview
-**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord.
+**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord. When no live game is detected, it displays the upcoming matchup with your opponent's logo and shows the score from the previous game. The large and small image tooltips include each team's win–loss record. Pre-game statuses now also show the scheduled start time. Live game updates display the current ball and strike count for the batter only during active half-innings, and show which players are up next between innings.
 
 ## Screenshots
 Screenshosts of different states of matches
@@ -41,12 +41,19 @@ Screenshosts of different states of matches
 
 ![pregame](https://github.com/user-attachments/assets/ad1dd8e8-f9a1-4c07-8761-c75be7e8f480)
 
-**Live Game Example:**  
-will add when theres a live game :)
+**Live Game Example (with player on 1nd base):**
+
+![livegame](https://github.com/user-attachments/assets/6d88759a-f1fb-49d6-96d1-4f47187f7a4d)
 
 **Final Game Example:**
 
-![finalegameexample](https://github.com/user-attachments/assets/ff8d5531-d82b-4c62-baad-6b7683bd0bb3)
+![finalegameexample](https://github.com/user-attachments/assets/0e8d6592-fa1a-4212-89f0-a2bf651cc18e)
+
+
+**Pre Game state:**
+
+![pregame](https://github.com/user-attachments/assets/add81593-965a-400a-8be5-6e1404eb4eac)
+
 
 ## Getting Started
 
