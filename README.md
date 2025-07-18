@@ -39,7 +39,7 @@ Screenshosts of different states of matches
 
 **Pre Game Example:**
 
-![pregame](https://github.com/user-attachments/assets/ad1dd8e8-f9a1-4c07-8761-c75be7e8f480)
+![pregame](https://github.com/user-attachments/assets/add81593-965a-400a-8be5-6e1404eb4eac)
 
 **Live Game Example (with player on 1nd base):**
 
@@ -48,12 +48,6 @@ Screenshosts of different states of matches
 **Final Game Example:**
 
 ![finalegameexample](https://github.com/user-attachments/assets/0e8d6592-fa1a-4212-89f0-a2bf651cc18e)
-
-
-**Pre Game state:**
-
-![pregame](https://github.com/user-attachments/assets/add81593-965a-400a-8be5-6e1404eb4eac)
-
 
 ## Getting Started
 
