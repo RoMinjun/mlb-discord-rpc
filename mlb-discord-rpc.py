@@ -501,7 +501,11 @@ def build_presence(game, team_info, local_tz, icons, abbr_map):
         if next_game:
             state_parts.append(next_game)
     else:
-        state_parts.append(status)
+        start_time = format_start_time(game, local_tz)
+        if start_time:
+            state_parts.append(f"{status} • {start_time}")
+        else:
+            state_parts.append(status)
 
     details = f"{main_abbr} {main_score} vs {opp_abbr} {opp_score}"
     if status in ["Final", "Game Over"]:
