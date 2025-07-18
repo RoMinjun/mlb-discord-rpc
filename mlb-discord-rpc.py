@@ -9,6 +9,7 @@ import tzlocal
 from zoneinfo import ZoneInfo
 from requests.exceptions import RequestException
 from dotenv import load_dotenv
+from plyer import notification
 
 # Load .env variables
 load_dotenv()
@@ -35,6 +36,13 @@ except ModuleNotFoundError:
 def ordinal(n):
     return f"{n}{'th' if 11 <= n % 100 <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
+def send_notification(title, message):
+    """Display a desktop notification if possible."""
+    try:
+        notification.notify(title=title, message=message, timeout=5)
+    except Exception as e:
+        print("Notification failed:", e)
+
 def format_start_time(game, tz):
     """Return formatted local start time for a game."""
     try:
@@ -58,6 +66,8 @@ def parse_args(config):
     team_abbr = config.get("team")
     tz_name = config.get("timezone")
     live_only = config.get("live_only", False)
+    notify_start = config.get("notify_start", False)
+    start_window = int(config.get("start_window", 15))
 
     args = sys.argv[1:]
     for i, arg in enumerate(args):
@@ -67,6 +77,14 @@ def parse_args(config):
             tz_name = args[i + 1]
         elif arg == "--live-only":
             live_only = True
+        elif arg == "--notify-start":
+            notify_start = True
+        elif arg == "--start-window" and i + 1 < len(args):
+            try:
+                start_window = int(args[i + 1])
+            except ValueError:
+                print("Invalid value for --start-window")
+                sys.exit(1)
 
     if not team_abbr:
         print("Usage: python script.py --team <TEAM_ABBR> [--tz TIMEZONE] [--live-only]")
@@ -78,7 +96,7 @@ def parse_args(config):
         print(f"Invalid timezone '{tz_name}':", e)
         sys.exit(1)
 
-    return team_abbr, local_tz, live_only
+    return team_abbr, local_tz, live_only, notify_start, start_window
 
 def get_team_abbr_map():
     try:
@@ -222,13 +240,14 @@ def get_next_game_info(team_id, local_tz, abbr_map):
                 (main_record.get("wins"), main_record.get("losses")),
                 (opp_record.get("wins"), opp_record.get("losses")),
                 start_str,
+                local_dt,
                 series_status,
                 series_game,
                 series_total,
             )
     except RequestException as e:
         print("Failed to fetch next game info:", e)
-    return None, None, None, None, (None, None), (None, None), None, None, None, None
+    return None, None, None, None, (None, None), (None, None), None, None, None, None, None
 
 def get_previous_game_score(team_id, abbr_map):
     """Return the last game's score."""
@@ -423,6 +442,25 @@ def shorten_name(name):
         pass
     return name
 
+def check_special_events(game, last_id):
+    """Return highlight message and new event id if notable play occurred."""
+    play = (
+        game.get("linescore", {}).get("currentPlay")
+        or game.get("currentPlay")
+        or {}
+    )
+    event_id = play.get("atBatIndex") or play.get("about", {}).get("atBatIndex")
+    if event_id is None or event_id == last_id:
+        return None, last_id
+    last_id = event_id
+    desc = play.get("result", {}).get("description", "")
+    event = play.get("result", {}).get("event", "")
+    if "Home Run" in event or "Home Run" in desc:
+        return f"HOME RUN! {desc}", last_id
+    if "Pitching" in event and "Substitution" in event or "Pitching Change" in desc:
+        return f"Pitching Change: {desc}", last_id
+    return None, last_id
+
 def build_presence(game, team_info, local_tz, icons, abbr_map):
     linescore = game.get("linescore", {})
     home = game["teams"]["home"]
@@ -550,7 +588,7 @@ def connect_rpc():
 
 def main():
     config = load_config()
-    team_abbr, local_tz, live_only = parse_args(config)
+    team_abbr, local_tz, live_only, notify_start, start_window = parse_args(config)
 
     icons = {
         "filled": config.get("display", {}).get("base_icon_filled", DEFAULT_BASE_ICON_FILLED),
@@ -567,6 +605,12 @@ def main():
         return
 
     rpc = connect_rpc()
+
+    start_notified = None
+    last_event_id = None
+    highlight_until = 0
+    highlight_details = None
+    highlight_base = None
 
     try:
         while True:
@@ -591,6 +635,7 @@ def main():
                                 main_rec,
                                 opp_rec,
                                 start_str,
+                                next_dt,
                                 series_status,
                                 series_game,
                                 series_total,
@@ -621,7 +666,22 @@ def main():
                                 time.sleep(idle_interval)
                                 continue
                         raise
-                    rpc.update(**activity)
+                    special, last_event_id = check_special_events(game, last_event_id)
+                    if special:
+                        highlight_details = special
+                        highlight_until = time.time() + 30
+                    if highlight_details and time.time() < highlight_until:
+                        rpc.update(
+                            details=highlight_details,
+                            state=activity["details"],
+                            large_image=activity["large_image"],
+                            large_text=activity["large_text"],
+                            small_image=activity.get("small_image"),
+                            small_text=activity.get("small_text"),
+                        )
+                    else:
+                        highlight_details = None
+                        rpc.update(**activity)
                     time.sleep(live_interval if abstract_state == "Live" else idle_interval)
                 else:
                     if live_only:
@@ -635,6 +695,7 @@ def main():
                             main_rec,
                             opp_rec,
                             start_str,
+                            next_dt,
                             series_status,
                             series_game,
                             series_total,
@@ -656,6 +717,13 @@ def main():
                             "large_image": logo,
                             "large_text": f"{team_info['name']} • {main_record}"
                         }
+                        if notify_start and next_dt:
+                            now_dt = datetime.now(local_tz)
+                            if next_dt - now_dt <= timedelta(minutes=start_window):
+                                if start_notified != next_dt:
+                                    send_notification("Game starting soon", details_field)
+                                    start_notified = next_dt
+                                update_data["state"] = f"Starting soon • {start_str}"
                         if opp_logo:
                             update_data["small_image"] = opp_logo
                         if opp_name:

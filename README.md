@@ -32,7 +32,7 @@
 * [Options & Configuration](#options--configuration)
 
 ## Overview
-**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord. When no live game is detected, it displays the upcoming matchup with your opponent's logo and shows the score from the previous game. The large and small image tooltips include each team's win–loss record. Pre-game statuses now also show the scheduled start time. Live game updates display the current ball and strike count for the batter only during active half-innings, and show which players are up next between innings.
+**mlb-discord-rpc** shows live Major League Baseball game updates as your Discord status. It uses Discord Rich Presence to display real-time scores, game status, and player info for your favorite team while you use Discord. When no live game is detected, it displays the upcoming matchup with your opponent's logo and shows the score from the previous game. The large and small image tooltips include each team's win–loss record. Pre-game statuses now also show the scheduled start time. Live game updates display the current ball and strike count for the batter only during active half-innings, and show which players are up next between innings. Recent versions add optional desktop notifications when your game is about to start and temporary highlight messages for home runs or pitching changes.
 
 ## Screenshots
 Screenshosts of different states of matches
@@ -91,11 +91,15 @@ You can configure **mlb-discord-rpc** via command-line options, a `config.toml` 
   Override the detected local timezone. Use [IANA timezone names](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) (e.g., `America/Toronto`).
 * `--live-only`
   Only show your Discord status when your team has a live game.
+* `--notify-start`
+  Display a desktop alert shortly before your next game begins.
+* `--start-window <MINUTES>`
+  How many minutes before first pitch to trigger the notification (default 15).
 
 **Example:**
 
 ```sh
-python script.py --team TOR --tz America/Toronto --live-only
+python script.py --team TOR --tz America/Toronto --live-only --notify-start
 ```
 
 ---
@@ -108,6 +112,8 @@ Example:
 team = "TOR"
 timezone = "America/Toronto"
 live_only = true
+notify_start = true
+start_window = 15
 
 [display]
 base_icon_filled = "🟦"
@@ -121,6 +127,8 @@ idle_interval = 90
 * `team` - Team abbreviation (required)
 * `timezone` - IANA timezone string (optional)
 * `live_only` - Only display presence when game is live (optional)
+* `notify_start` - Enable game start notifications (optional)
+* `start_window` - Minutes before first pitch to send the alert
 * `[display]` - Customize base icons
 * `[refresh]` - Customize update intervals in seconds
 

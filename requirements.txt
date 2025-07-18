@@ -2,3 +2,4 @@ requests
 pypresence
 tzlocal
 python-dotenv
+plyer
