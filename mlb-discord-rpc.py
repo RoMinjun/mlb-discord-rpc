@@ -25,7 +25,7 @@ DEFAULT_IDLE_INTERVAL = 90
 
 TEAM_DATA_URL = "https://statsapi.mlb.com/api/v1/teams?sportId=1"
 SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1&hydrate=linescore(runners),boxscore,team"
-LOGO_TEMPLATE = "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/{}.png&h=64&w=64"
+LOGO_TEMPLATE = "https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/{}.png&h=1024&w=1024"
 
 try:
     import tomllib
